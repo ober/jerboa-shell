@@ -709,8 +709,11 @@
     (cond
       [(string? path-or-settings)
        (if (dev-fd-path? path-or-settings)
+         ;; Use buffer-mode none for /dev/fd/N ports to prevent buffered reads
+         ;; from consuming bytes that ffi-fdread (used by read builtin) also
+         ;; reads from the same raw fd, causing data loss in pipelines.
          (open-file-input-port path-or-settings
-           (file-options no-fail) (buffer-mode block)
+           (file-options no-fail) (buffer-mode none)
            (make-transcoder (utf-8-codec)))
          (chez:open-input-file path-or-settings))]
       [(pair? path-or-settings)
@@ -724,7 +727,7 @@
          (unless path (error 'open-input-file "no path: in settings" path-or-settings))
          (if (dev-fd-path? path)
            (open-file-input-port path
-             (file-options no-fail) (buffer-mode block)
+             (file-options no-fail) (buffer-mode none)
              (make-transcoder (utf-8-codec)))
            (chez:open-input-file path)))]
       [else (error 'open-input-file "invalid argument" path-or-settings)]))
