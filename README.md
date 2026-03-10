@@ -45,3 +45,4 @@ make binary
 JERBOA  ?= $(HOME)/mine/jerboa/lib   # Jerboa runtime path
 GHERKIN ?= $(HOME)/mine/gherkin/src  # Gherkin compiler path
 ```
+# jerboa-shell
