@@ -91,6 +91,12 @@
                [optimize-level 3]
                [cp0-effort-limit 500]
                [cp0-score-limit 50]
+               [cp0-outer-unroll-limit 1]
+               [commonization-level 4]
+               [enable-unsafe-application #t]
+               [enable-unsafe-variable-reference #t]
+               [enable-arithmetic-left-associative #t]
+               [debug-level 0]
                [generate-inspector-information #f]
                [generate-wpo-files #t])
   (compile-program "gsh.ss"))

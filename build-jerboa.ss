@@ -439,6 +439,76 @@
   ;; Fix make-mutex: Chez requires symbol or #f, not strings
   (patch-file! "src/gsh/pipeline.sls"
     "(make-mutex \"pipeline-fd\")"
-    "(make-mutex 'pipeline-fd)"))
+    "(make-mutex 'pipeline-fd)")
+
+  ;; --- Performance optimizations ---
+
+  ;; Add PATH lookup cache to util.sls (which-cached)
+  (patch-file! "src/gsh/util.sls"
+    "string-last-index-of which find-file-in-path executable?"
+    "string-last-index-of which which-cached which-cache-invalidate!\n   find-file-in-path executable?")
+
+  (patch-file! "src/gsh/util.sls"
+    "(define find-file-in-path"
+    (string-append
+      ";; PATH lookup cache — equivalent to bash's command_hash\n"
+      "  (define *which-cache* (make-hashtable string-hash string=?))\n"
+      "  (define *which-cache-path* #f)\n"
+      "  (define (which-cache-invalidate!)\n"
+      "    (hashtable-clear! *which-cache*)\n"
+      "    (set! *which-cache-path* #f))\n"
+      "  (define (which-cached name)\n"
+      "    (if (string-contains? name \"/\")\n"
+      "        (which name)\n"
+      "        (let ([current-path (or (getenv \"PATH\" #f) \"/usr/bin:/bin\")])\n"
+      "          (unless (equal? current-path *which-cache-path*)\n"
+      "            (hashtable-clear! *which-cache*)\n"
+      "            (set! *which-cache-path* current-path))\n"
+      "          (let ([cached (hashtable-ref *which-cache* name #f)])\n"
+      "            (or cached\n"
+      "                (let ([found (which name)])\n"
+      "                  (when found (hashtable-set! *which-cache* name found))\n"
+      "                  found))))))\n"
+      "  (define find-file-in-path"))
+
+  ;; Replace (which cmd-name) with (which-cached cmd-name) in executor.sls
+  ;; Use a helper to replace all occurrences
+  (let ((path "src/gsh/executor.sls"))
+    (let* ((content (call-with-input-file path
+                      (lambda (p) (get-string-all p))))
+           (old "(which cmd-name)")
+           (new "(which-cached cmd-name)")
+           (olen (string-length old))
+           (nlen (string-length new)))
+      (let loop ((i 0) (result ""))
+        (cond
+          ((> (+ i olen) (string-length content))
+           (let ((final (string-append result (substring content i (string-length content)))))
+             (call-with-output-file path
+               (lambda (p) (display final p))
+               'replace)
+             (printf "  Patched executor.sls: which -> which-cached~n")))
+          ((string=? (substring content i (+ i olen)) old)
+           (loop (+ i olen) (string-append result new)))
+          (else
+           (loop (+ i 1) (string-append result (substring content i (+ i 1)))))))))
+
+  ;; env-get single-pass: eliminate double hash-table scan in env-get
+  (patch-file! "src/gsh/environment.sls"
+    (string-append
+      "      [else\n"
+      "       (let ([resolved (resolve-nameref name env)])\n"
+      "         (let ([var (find-var-in-chain env resolved)])\n"
+      "           (if (and var (shell-var-nameref? var))\n"
+      "               #f\n"
+      "               (env-get-chain env resolved))))])")
+    (string-append
+      "      [else\n"
+      "       (let ([resolved (resolve-nameref name env)])\n"
+      "         (let ([var (find-var-in-chain env resolved)])\n"
+      "           (cond\n"
+      "             [(not var) (getenv resolved #f)]\n"
+      "             [(shell-var-nameref? var) #f]\n"
+      "             [else (shell-var-scalar-value var)])))])")))
 
 (display "\n=== Build complete ===\n")
