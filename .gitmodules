@@ -1,0 +1,3 @@
+[submodule "gerbil-shell"]
+	path = gerbil-shell
+	url = https://github.com/ober/gerbil-shell.git

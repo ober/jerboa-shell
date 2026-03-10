@@ -1,0 +1,46 @@
+# Build artifacts
+*.so
+*.wpo
+*.o
+*.boot
+gsh
+gsh-kernel
+gsh_program.h
+gsh-all.so
+libgsh-ffi.so
+
+# Auto-generated .sls files (built by build-gherkin.ss from .ss sources)
+# Handwritten files are explicitly tracked via git add -f
+src/gsh/arithmetic.sls
+src/gsh/ast.sls
+src/gsh/builtins.sls
+src/gsh/completion.sls
+src/gsh/control.sls
+src/gsh/environment.sls
+src/gsh/executor.sls
+src/gsh/expander.sls
+src/gsh/functions.sls
+src/gsh/fuzzy.sls
+src/gsh/fzf.sls
+src/gsh/glob.sls
+src/gsh/history.sls
+src/gsh/jobs.sls
+src/gsh/lexer.sls
+src/gsh/lineedit.sls
+src/gsh/macros.sls
+src/gsh/main.sls
+src/gsh/parser.sls
+src/gsh/pipeline.sls
+src/gsh/prompt.sls
+src/gsh/redirect.sls
+src/gsh/registry.sls
+src/gsh/script.sls
+src/gsh/signals.sls
+src/gsh/startup.sls
+src/gsh/util.sls
+
+# Vendor
+_vendor/
+
+# Cache
+.gerbil-lsp-cache/
