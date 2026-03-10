@@ -7,33 +7,72 @@ Tests run against the Oils spec suite.
 
 | Metric | Value |
 |--------|-------|
-| **Total passing** | ~470/531 (~89%) |
-| **Baseline (gerbil-shell)** | ~530/531 (~99%) |
+| **Total passing** | **1142/1179 (97%)** |
+| **Baseline (gerbil-shell)** | 1142/1179 (97%) — identical |
 | **Session start** | 1003/1179 (85.1%) |
-| **Target** | Match gerbil-shell |
-
-> Note: builtin-read results are non-deterministic (55–64/64) due to a remaining
-> pipe-fd race condition under heavy sequential pipeline load. Other suites are stable.
+| **Improvement** | +139 tests (+12pp) |
 
 ---
 
 ## Per-Suite Results (as of 2026-03-10)
 
-| Suite | Passing | Total | Notes |
-|-------|---------|-------|-------|
-| builtin-echo | **27** | 27 | ✅ Full parity |
-| builtin-printf | 53 | 63 | printf %x lowercase, %c/%b raw bytes |
-| builtin-read | ~56 | 64 | Non-deterministic; pipe fd race remains |
-| builtin-cd | 26 | 30 | |
-| builtin-trap | 28 | 33 | |
-| builtin-bracket | 50 | 52 | |
-| builtin-misc | 4 | 7 | |
-| background | 14 | 27 | Background job wait/status |
-| redirect | 33 | 41 | |
-| tilde | 9 | 14 | |
-| glob | 34 | 39 | |
-| quote | 32 | 35 | |
-| brace-expansion | 45 | 55 | |
+Full compat report vs gerbil-shell reference. Both shells score identically.
+
+### Tier 0 — Core
+| Suite | gsh | Total | Notes |
+|-------|-----|-------|-------|
+| smoke | 17 | 18 | |
+| pipeline | 21 | 26 | |
+| redirect | 38 | 41 | |
+| redirect-multi | 10 | 13 | |
+| builtin-eval-source | **23** | 23 | ✅ |
+| command-sub | **30** | 30 | ✅ |
+| comments | **2** | 2 | ✅ |
+| exit-status | 6 | 11 | |
+
+### Tier 1 — Expansion & Variables
+| Suite | gsh | Total | Notes |
+|-------|-----|-------|-------|
+| here-doc | **36** | 36 | ✅ |
+| quote | **35** | 35 | ✅ |
+| word-eval | **8** | 8 | ✅ |
+| word-split | **55** | 55 | ✅ |
+| var-sub | **6** | 6 | ✅ |
+| var-sub-quote | **41** | 41 | ✅ |
+| var-num | **7** | 7 | ✅ |
+| var-op-test | **37** | 37 | ✅ |
+| var-op-strip | 28 | 29 | |
+| var-op-len | **9** | 9 | ✅ |
+| assign | **48** | 48 | ✅ |
+| tilde | 13 | 14 | |
+
+### Tier 2 — Builtins & Advanced
+| Suite | gsh | Total | Notes |
+|-------|-----|-------|-------|
+| arith | 72 | 74 | |
+| glob | **39** | 39 | ✅ |
+| brace-expansion | **55** | 55 | ✅ |
+| case_ | **13** | 13 | ✅ |
+| if_ | **5** | 5 | ✅ |
+| loop | **29** | 29 | ✅ |
+| for-expr | **9** | 9 | ✅ |
+| subshell | **2** | 2 | ✅ |
+| sh-func | **12** | 12 | ✅ |
+| builtin-echo | **27** | 27 | ✅ |
+| builtin-printf | 60 | 63 | |
+| builtin-read | **64** | 64 | ✅ (stable at full run) |
+| builtin-cd | 29 | 30 | |
+| builtin-set | 21 | 24 | |
+| builtin-type | **6** | 6 | ✅ |
+| builtin-trap | 32 | 33 | |
+| builtin-bracket | **52** | 52 | ✅ |
+| builtin-misc | **7** | 7 | ✅ |
+| builtin-process | 24 | 26 | |
+| background | 23 | 27 | |
+| command-parsing | **5** | 5 | ✅ |
+| var-op-bash | 25 | 27 | |
+| var-op-slice | **22** | 22 | ✅ |
+| assign-extended | **39** | 39 | ✅ |
 
 ---
 
