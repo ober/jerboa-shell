@@ -178,6 +178,15 @@ const char* ffi_get_read_buf(void) {
     return _ffi_read_buf;
 }
 
+/* Copy read buffer into a pre-allocated byte array (u8* in Chez FFI).
+   Returns the number of bytes actually copied. */
+int ffi_copy_read_buf(unsigned char *out, int maxlen) {
+    int n = (int)_ffi_read_buf_len;
+    if (n > maxlen) n = maxlen;
+    memcpy(out, _ffi_read_buf, n);
+    return n;
+}
+
 /* ========== Strftime ========== */
 
 static char _strftime_buf[128];
@@ -442,6 +451,14 @@ int ffi_fdread(int fd, char *buf, int count) {
 int ffi_fdwrite(int fd, const char *buf, int count) {
     ssize_t n;
     do { n = write(fd, buf, count); } while (n < 0 && errno == EINTR);
+    return (int)n;
+}
+
+/* Write a single raw byte to a file descriptor, bypassing Chez text port encoding */
+int ffi_write_byte(int fd, int byte) {
+    unsigned char b = (unsigned char)byte;
+    ssize_t n;
+    do { n = write(fd, &b, 1); } while (n < 0 && errno == EINTR);
     return (int)n;
 }
 

@@ -182,11 +182,25 @@
 
   ;; --- Read ---
   (define c-ffi-do-read-all (foreign-procedure "ffi_do_read_all" (int) int))
-  (define c-ffi-get-read-buf (foreign-procedure "ffi_get_read_buf" () string))
+  ;; c-ffi-copy-read-buf fills a pre-allocated bytevector with raw bytes from
+  ;; the read buffer, avoiding Chez's UTF-8 decoding that replaces invalid
+  ;; bytes with U+FFFD. Returns the count actually copied.
+  (define c-ffi-copy-read-buf (foreign-procedure "ffi_copy_read_buf" (u8* int) int))
 
   (define (ffi-read-all-from-fd fd)
-    (c-ffi-do-read-all fd)
-    (c-ffi-get-read-buf))
+    ;; Read all bytes from fd and return a Latin-1 decoded Scheme string.
+    ;; Each byte 0x00-0xFF becomes char U+0000-U+00FF, preserving raw bytes.
+    ;; This matches Gambit's char-string behavior for ffi_get_read_buf.
+    (let* ((len (c-ffi-do-read-all fd))
+           (bv (make-bytevector len))
+           (_ (c-ffi-copy-read-buf bv len))
+           (result (make-string len)))
+      (let loop ((i 0))
+        (if (>= i len)
+          result
+          (begin
+            (string-set! result i (integer->char (bytevector-u8-ref bv i)))
+            (loop (+ i 1)))))))
 
   (define ffi-read-byte (foreign-procedure "ffi_read_byte" (int) int))
 

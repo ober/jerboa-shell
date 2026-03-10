@@ -192,31 +192,51 @@
          (loop (cddr rest) init (cadr rest)))
         (else (loop (cdr rest) init encoding)))))
 
-  ;; Gambit open-output-u8vector: creates a port that accumulates bytes
-  ;; (open-output-u8vector (list 'char-encoding: 'UTF-8))
-  ;; Returns a port; get-output-u8vector extracts the bytevector
-  (define (open-output-u8vector . props-opt)
-    (let* ((props (if (pair? props-opt) (car props-opt) '()))
-           (encoding (let loop ((rest (if (list? props) props '())))
-                       (cond
-                         ((null? rest) 'UTF-8)
-                         ((and (pair? (cdr rest))
-                               (memq (car rest) '(char-encoding char-encoding:)))
-                          (cadr rest))
-                         (else (loop (cdr rest))))))
-           (tc (make-transcoder
-                 (case encoding
-                   ((UTF-8 utf-8 utf8) (utf-8-codec))
-                   ((latin-1 ISO-8859-1 latin1) (latin-1-codec))
-                   (else (utf-8-codec))))))
-      ;; open-bytevector-output-port returns (values port extractor)
-      ;; We need to stash the extractor so get-output-u8vector can call it
-      (let-values (((port extract) (open-bytevector-output-port tc)))
-        ;; Store extract function as a port property via a weak hashtable
-        (hashtable-set! *u8vector-port-extractors* port extract)
-        port)))
-
+  ;; Gambit open-output-u8vector: creates a textual port that accumulates raw bytes.
+  ;; Supports both display (text → UTF-8 encoded bytes) and write-u8 (raw bytes).
+  ;; This is needed because Chez separates textual and binary ports — a textual port
+  ;; cannot accept put-u8 calls. We use a custom textual port backed by a chunk list,
+  ;; and track a raw-byte writer in a parallel hashtable so write-u8 can bypass encoding.
   (define *u8vector-port-extractors* (make-weak-eq-hashtable))
+  (define *u8vector-raw-writers* (make-weak-eq-hashtable))
+
+  (define (open-output-u8vector . props-opt)
+    ;; chunks: list of bytevectors accumulated in reverse order
+    (let ((chunks '()))
+      (let* ((write-string!
+               (lambda (str start count)
+                 ;; Encode the substring as UTF-8 bytes and append to chunks.
+                 (let* ((sub (if (and (= start 0) (= count (string-length str)))
+                               str
+                               (substring str start (+ start count))))
+                        (bv (string->utf8 sub)))
+                   (set! chunks (cons bv chunks)))
+                 count))
+             (port (make-custom-textual-output-port
+                     "u8vector-port"
+                     write-string!
+                     #f    ;; get-position
+                     #f    ;; set-position!
+                     #f))  ;; close
+             (extractor
+               (lambda ()
+                 (flush-output-port port)
+                 (let* ((all-chunks (reverse chunks))
+                        (total (apply + (map bytevector-length all-chunks)))
+                        (result (make-bytevector total)))
+                   (let loop ((pos 0) (chs all-chunks))
+                     (if (null? chs)
+                       result
+                       (let ((bv (car chs)))
+                         (bytevector-copy! bv 0 result pos (bytevector-length bv))
+                         (loop (+ pos (bytevector-length bv)) (cdr chs)))))))))
+        (hashtable-set! *u8vector-port-extractors* port extractor)
+        (hashtable-set! *u8vector-raw-writers* port
+                        (lambda (byte)
+                          ;; Flush buffered text first, then append raw byte.
+                          (flush-output-port port)
+                          (set! chunks (cons (bytevector byte) chunks))))
+        port)))
 
   (define (get-output-u8vector port)
     (let ((extract (hashtable-ref *u8vector-port-extractors* port #f)))
@@ -233,13 +253,40 @@
     (let ((port (if (pair? port-opt) (car port-opt) (current-output-port))))
       (if (binary-port? port)
         (put-bytevector port bv start (- end start))
-        ;; Textual port: convert bytevector slice to string
-        (let ((sub (if (and (= start 0) (= end (bytevector-length bv)))
-                     bv
-                     (let ((r (make-bytevector (- end start))))
-                       (bytevector-copy! bv start r 0 (- end start))
-                       r))))
-          (display (utf8->string sub) port)))))
+        ;; Textual port: flush it, then write raw bytes to the underlying fd.
+        ;; Using utf8->string would corrupt raw bytes (invalid UTF-8 → U+FFFD).
+        (let ((raw-writer (hashtable-ref *u8vector-raw-writers* port #f)))
+          (cond
+            ;; In-memory u8vector port — write via chunk accumulator
+            (raw-writer
+             (let loop ((i start))
+               (when (< i end)
+                 (raw-writer (bytevector-u8-ref bv i))
+                 (loop (+ i 1)))))
+            (else
+             ;; File/pipe/console port — flush then write raw bytes to fd
+             (let ((fd (guard (exn (#t #f)) (port-file-descriptor port))))
+               (cond
+                 (fd
+                  (flush-output-port port)
+                  (let loop ((i start))
+                    (when (< i end)
+                      (c-ffi-write-byte fd (bytevector-u8-ref bv i))
+                      (loop (+ i 1)))))
+                 ((or (eq? port (standard-output-port))
+                      (eq? port (current-output-port)))
+                  (flush-output-port port)
+                  (let loop ((i start))
+                    (when (< i end)
+                      (c-ffi-write-byte 1 (bytevector-u8-ref bv i))
+                      (loop (+ i 1)))))
+                 (else
+                  ;; Last resort: treat as binary (may fail on textual ports)
+                  (let loop ((i start))
+                    (when (< i end)
+                      (put-u8 port (bytevector-u8-ref bv i))
+                      (loop (+ i 1)))))))))))))
+
 
   ;; --- Path ---
   (define (path-normalize path)
@@ -364,9 +411,36 @@
     (let ((port (if (pair? args) (car args) (current-output-port))))
       (flush-output-port port)))
 
+  ;; Raw byte writer: bypasses Chez textual port UTF-8 encoding.
+  ;; Must flush textual port first so bytes appear in correct order.
+  (define c-ffi-write-byte
+    (foreign-procedure "ffi_write_byte" (int int) int))
+
   (define (write-u8 byte . args)
-    (let ((port (if (pair? args) (car args) (standard-output-port))))
-      (put-u8 port byte)))
+    (let* ((port (if (pair? args) (car args) (current-output-port))))
+      ;; Check for in-memory u8vector port first (raw-writers table).
+      ;; These are textual ports that can't accept put-u8; use chunk accumulator.
+      (let ((raw-writer (hashtable-ref *u8vector-raw-writers* port #f)))
+        (cond
+          ;; In-memory u8vector port — flush text buffer then append raw byte
+          (raw-writer
+           (raw-writer byte))
+          (else
+           ;; File/pipe/console port — flush then write raw byte to fd
+           (let ((fd (guard (exn (#t #f)) (port-file-descriptor port))))
+             (cond
+               ;; File/pipe port with known fd
+               (fd
+                (flush-output-port port)
+                (c-ffi-write-byte fd byte))
+               ;; Standard output port (terminal/piped stdout)
+               ((or (eq? port (standard-output-port))
+                    (eq? port (current-output-port)))
+                (flush-output-port port)
+                (c-ffi-write-byte 1 byte))
+               ;; Last resort: try put-u8 (works on binary ports)
+               (else
+                (put-u8 port byte)))))))))
 
   ;; close-port: Chez has close-port built-in
   ;; (re-export for compatibility)
