@@ -6,33 +6,33 @@
 
 | Test | jerboa-sh | gerbil-sh | ratio |
 |------|-----------|-----------|-------|
-| Empty loop (10k iters) | 3.43s | 2.38s | **1.44×** slower |
-| Variable assign (5k) | 1.72s | 1.02s | **1.68×** slower |
-| String length (5k) | 1.63s | 0.95s | **1.72×** slower |
-| Echo output (5k) | 1.83s | 1.31s | **1.40×** slower |
-| Arithmetic (5k) | 1.91s | 1.27s | **1.50×** slower |
-| Comparison `[ ]` (5k) | 2.02s | 2.07s | **0.98×** (faster!) |
-| Function call (5k) | 2.00s | 1.16s | **1.73×** slower |
-| Substr `${x#a}` (5k) | 1.74s | 1.08s | **1.61×** slower |
-| `test` loop (2k) | 0.45s | 0.15s | **2.9×** slower |
+| Empty loop (10k iters) | 3.43s | 2.38s | **1.44x** slower |
+| Variable assign (5k) | 1.72s | 1.02s | **1.68x** slower |
+| String length (5k) | 1.63s | 0.95s | **1.72x** slower |
+| Echo output (5k) | 1.83s | 1.31s | **1.40x** slower |
+| Arithmetic (5k) | 1.91s | 1.27s | **1.50x** slower |
+| Comparison `[ ]` (5k) | 2.02s | 2.07s | **0.98x** (faster!) |
+| Function call (5k) | 2.00s | 1.16s | **1.73x** slower |
+| Substr `${x#a}` (5k) | 1.74s | 1.08s | **1.61x** slower |
+| `test` loop (2k) | 0.45s | 0.15s | **2.9x** slower |
 
-**Root cause summary** (confirmed via strace + profiling):
+**Root cause summary** (confirmed via strace):
 
-1. `thread-yield!` → `clock_nanosleep(0)` syscall on every loop iteration
-2. Chez library-boundary call overhead not fully eliminated by WPO
-3. Missing build-level optimizations: `commonization-level`, `enable-unsafe-application`, `debug-level 0`
-4. Compat wrapper functions blocking cp0 inlining of hot primitives
-5. Uncached command PATH lookups (2× `file-exists?` + `executable?` per miss)
-6. Redundant `parameterize` calls in execution hot path
-7. Double hash-table lookup in `env-get` (find-var-in-chain + env-get-chain)
+1. `thread-yield!` -> `clock_nanosleep(0)` syscall on every loop iteration
+2. Missing build-level optimizations: `commonization-level`, `enable-unsafe-application`, `debug-level 0`
+3. Compat wrapper procedures (`hash-get`) blocking cp0 inlining of hot primitives
+4. Uncached command PATH lookups (`file-exists?` + `executable?` per PATH dir per miss)
+5. Redundant `parameterize` calls in execution hot path
+6. Double hash-table lookup in `env-get` (find-var-in-chain + env-get-chain) for nameref checking
+7. Polling-based job wait loops (`thread-sleep!` + `thread-yield!`) instead of blocking waitpid
 
 ---
 
-## Part 1: Immediate Wins (No Rebuild of gherkin/.sls Required)
+## Part 1: Immediate Wins (No .sls Code Changes Required)
 
 ### 1.1 — Replace `thread-yield!` with a No-Op in Chez
 
-**File:** `~/mine/jerboa/lib/std/misc/thread.sls`, line 155–157
+**File:** `~/mine/jerboa/lib/std/misc/thread.sls`, lines 155-157
 
 **Problem:** The current implementation:
 ```scheme
@@ -40,18 +40,22 @@
   ;; Chez doesn't have an explicit yield; sleep briefly
   (sleep (make-time 'time-duration 0 0)))
 ```
-This calls `clock_nanosleep(CLOCK_REALTIME, 0, {0,0}, NULL)` — a real kernel syscall — on **every loop iteration** of the shell. Measured: 3–4 nanosleeps per while-loop iteration (1 from `execute-while`, 1–2 from sequential command list dispatch, 1 from `:` builtin path).
+This calls `clock_nanosleep(CLOCK_REALTIME, 0, {0,0}, NULL)` — a real kernel syscall — on **every loop iteration** of the shell. The call sites are:
+- `control.sls:72` — every `for` loop iteration
+- `control.sls:120` — every `while` loop iteration
+- `control.sls:195` — every `until` loop iteration
+- `jobs.sls:351,381,495` — job wait polling loops
 
-For a tight `while` loop of 10,000 iterations: **40,000 unnecessary syscalls**.
+For a tight `while` loop of 10,000 iterations: **~10,000+ unnecessary syscalls**.
 
 **Fix:** Chez Scheme has fully preemptive POSIX threads; cooperative yielding is unnecessary. Replace with a true no-op:
 ```scheme
 (define (thread-yield!) (void))
 ```
 
-**Expected gain:** Eliminates ~40,000 `clock_nanosleep` syscalls per 10k-iteration loop. Based on measured syscall cost (~2μs each), saves ~80ms per 10k iters, but more importantly eliminates thread deschedule events that inflate real time.
+**Expected gain:** Eliminates ~10,000 `clock_nanosleep` syscalls per 10k-iteration loop. Based on measured syscall cost (~2us each), saves ~20ms per 10k iters, but more importantly eliminates thread deschedule events that inflate real time.
 
-**Risk:** None. Chez's preemptive scheduler handles thread fairness automatically. The only callers (`control.sls`, `executor.sls`, `jobs.sls`) use `thread-yield!` for cooperative multitasking — not needed on Chez.
+**Risk:** Low. Chez's preemptive scheduler handles thread fairness automatically. However, verify that `jobs.sls` wait loops still function correctly — they may need a small `thread-sleep!` to avoid busy-spinning (see 3.1 for a proper fix).
 
 After changing `thread.sls`, rebuild jerboa and then rebuild jerboa-shell binary.
 
@@ -59,7 +63,7 @@ After changing `thread.sls`, rebuild jerboa and then rebuild jerboa-shell binary
 
 ### 1.2 — Add Missing Build Optimizations to `build-binary.ss`
 
-**File:** `build-binary.ss`, lines 90–96
+**File:** `build-binary.ss`, lines 90-96
 
 **Current:**
 ```scheme
@@ -72,19 +76,19 @@ After changing `thread.sls`, rebuild jerboa and then rebuild jerboa-shell binary
   (compile-program "gsh.ss"))
 ```
 
-**Add these missing parameters** (validated against `docs/optimization.md` empirical results):
+**Add these missing parameters** (all verified to exist in the installed Chez; see `docs/optimization.md §12` for full reference):
 
 ```scheme
 (parameterize ([compile-imported-libraries #t]
                [optimize-level 3]
                [cp0-effort-limit 500]
                [cp0-score-limit 50]
-               [cp0-outer-unroll-limit 1]           ;; NEW: unroll tight loops once
-               [commonization-level 4]               ;; NEW: merge similar lambdas (-8% code, +icache)
-               [enable-unsafe-application #t]        ;; NEW: skip procedure? check on every call
-               [enable-unsafe-variable-reference #t] ;; NEW: skip letrec undefined-var checks
-               [enable-arithmetic-left-associative #t] ;; NEW: allow reassociation
-               [debug-level 0]                       ;; NEW: max continuation optimization
+               [cp0-outer-unroll-limit 1]           ;; NEW: unroll tight loops once (default: 0)
+               [commonization-level 4]               ;; NEW: merge similar lambdas (default: 0)
+               [enable-unsafe-application #t]        ;; NEW: skip procedure? check on every call (default: #f)
+               [enable-unsafe-variable-reference #t] ;; NEW: skip letrec undefined-var checks (default: #f)
+               [enable-arithmetic-left-associative #t] ;; NEW: allow reassociation (default: #f)
+               [debug-level 0]                       ;; NEW: max continuation optimization (default: 1)
                [generate-inspector-information #f]
                [generate-wpo-files #t])
   (compile-program "gsh.ss"))
@@ -92,22 +96,22 @@ After changing `thread.sls`, rebuild jerboa and then rebuild jerboa-shell binary
 
 **Parameter rationale:**
 
-| Parameter | Impact | Source |
-|-----------|--------|--------|
-| `commonization-level 4` | Merges structurally similar lambdas generated by gherkin match/defmethod/accessors. Reduces code size 5-10%, improves instruction cache. | `optimization.md §14` |
-| `enable-unsafe-application` | Skips the "is this a procedure?" check on every function call. Safe for generated code where all call targets are known. Middle ground below full opt-3 semantics. | `optimization.md §12` |
-| `enable-unsafe-variable-reference` | Skips `letrec` uninitialized-variable checks. Gherkin-generated code never reads before write. | `optimization.md §12` |
-| `debug-level 0` | Allows maximum continuation optimization (eliminates debug frames). | `optimization.md §12` |
-| `cp0-outer-unroll-limit 1` | Unrolls innermost named-let loops once — helps tight shell loops. | `optimization.md §13` |
+| Parameter | Default | Impact |
+|-----------|---------|--------|
+| `commonization-level 4` | 0 | Merges structurally similar lambdas generated by gherkin match/defmethod/accessors. Reduces code size, improves instruction cache (`optimization.md §14`). |
+| `enable-unsafe-application` | #f | Skips the "is this a procedure?" check on every function call. Safe for generated code where all call targets are known (`optimization.md §12`). |
+| `enable-unsafe-variable-reference` | #f | Skips `letrec` uninitialized-variable checks. Gherkin-generated code never reads before write (`optimization.md §12`). |
+| `enable-arithmetic-left-associative` | #f | Allows compiler to reassociate arithmetic for better optimization (`optimization.md §12`). |
+| `debug-level 0` | 1 | Allows maximum continuation optimization (eliminates debug frames) (`optimization.md §12`). |
+| `cp0-outer-unroll-limit 1` | 0 | Unrolls innermost named-let loops once — helps tight shell loops (`optimization.md §13`). |
 
-**Expected gain:** Based on `optimization.md §17` empirical data:
-- `commonization-level` alone: +3-5% (icache improvement)
-- `enable-unsafe-application`: +2-4% (eliminates procedure? check on every Scheme call)
-- Combined: estimated **+5-8%** on top of current baseline
+**Expected gain:** Estimated **+5-8%** combined, based on `optimization.md §17` empirical results showing +9.6% with full WPO + tuned cp0. The `enable-unsafe-application` alone should help since every Scheme function call currently checks the "is this a procedure?" invariant.
+
+**Caveats:** `enable-unsafe-application` means calling a non-procedure crashes rather than producing a clean error. This is acceptable for a compiled shell binary but would complicate debugging during development. Consider making this conditional on a `--release` build flag.
 
 ---
 
-### 1.3 — Apply Per-Module Optimization Directives to Hot Modules
+### 1.3 — Increase cp0 Budget for Hot Modules
 
 **Files:** `src/gsh/expander.sls`, `src/gsh/executor.sls`, `src/gsh/environment.sls`, `src/gsh/control.sls`
 
@@ -123,13 +127,15 @@ Add at the top of each file's `library` body (after the `import` form):
   (debug-level 0))
 ```
 
-**Why these four files?** The Explore agent identified them as the hot-path modules:
-- `expander.sls` (3,816 lines) — called for every word in every command
-- `executor.sls` (1,446 lines) — main command dispatch loop
-- `environment.sls` (1,502 lines) — variable lookup on every `$var` expansion
+**Why these four files?** They are the hot-path modules:
+- `expander.sls` (~3,800 lines) — called for every word in every command
+- `executor.sls` (~1,450 lines) — main command dispatch loop
+- `environment.sls` (~1,500 lines) — variable lookup on every `$var` expansion
 - `control.sls` (~1,200 lines) — while/for/until loop execution
 
-These are likely not getting full inlining benefits because Chez's cp0 budget is exhausted by the deeply nested gherkin-generated code. Higher limits let it inline across more levels.
+The default `cp0-effort-limit 500` may be exhausted before reaching inner loops in these large modules. Higher limits let cp0 inline across more levels.
+
+**Expected gain:** Estimated +2-4% on hot modules. Confidence is medium — depends on whether cp0 is actually budget-limited in these modules.
 
 ---
 
@@ -139,14 +145,18 @@ These are likely not getting full inlining benefits because Chez's cp0 budget is
 
 **File:** `src/gsh/util.sls`
 
-**Problem:** Every execution of a builtin command is checked via `builtin-lookup` (hash table — fast), but external commands hit `which` which calls `file-exists?` + `executable?` (two `access(2)` syscalls) across every directory in `$PATH`. Bash calls this `command_hash`.
+**Problem:** External command execution hits `which` (util.sls:151-164), which calls `file-exists?` + `executable?` (two `access(2)` syscalls) for each directory in `$PATH` until a match is found. Three separate code paths call `which`:
+- `executor.sls:487` — `execute-external`
+- `executor.sls:622` — `exec-command` (the `exec` builtin)
+- `executor.sls:1334` — `execute-simple-command` (assignments+external)
+
+In practice, a given command execution only takes one of these paths, so it's one `which` call per external command — but that still means scanning PATH directories for every invocation of `/usr/bin/grep`, `/usr/bin/cat`, etc. in a loop.
 
 **Fix:** Add a hash table cache for resolved command paths, invalidated when `$PATH` changes:
 
 ```scheme
-;; In util.sls, after existing definitions:
-(define *which-cache* (make-hashtable equal-hash equal?))
-(define *which-cache-path* #f)  ;; the PATH string when cache was built
+(define *which-cache* (make-hashtable string-hash string=?))
+(define *which-cache-path* #f)
 
 (define (which-cached name)
   (let ((current-path (or (getenv "PATH" #f) "/usr/bin:/bin")))
@@ -154,7 +164,6 @@ These are likely not getting full inlining benefits because Chez's cp0 budget is
     (unless (equal? current-path *which-cache-path*)
       (hashtable-clear! *which-cache*)
       (set! *which-cache-path* current-path))
-    ;; Check cache first
     (let ((cached (hashtable-ref *which-cache* name #f)))
       (or cached
           (let ((found (which name)))
@@ -162,9 +171,9 @@ These are likely not getting full inlining benefits because Chez's cp0 budget is
             found)))))
 ```
 
-Then in `executor.sls`, replace calls to `(which cmd-name)` (lines 487, 622, 1334) with `(which-cached cmd-name)`.
+Also need to invalidate the cache when `hash -r` is called (if the `hash` builtin is implemented).
 
-**Expected gain:** Eliminates repeated `access(2)` syscalls for frequently-used external commands. Less impact for pure-builtin scripts, but significant for scripts that invoke the same external command in a loop.
+**Expected gain:** Eliminates repeated `access(2)` syscalls for frequently-used external commands. Significant for scripts that invoke the same external command in a loop (e.g., `grep` in a while-read loop). Less impact for pure-builtin scripts.
 
 ---
 
@@ -172,161 +181,154 @@ Then in `executor.sls`, replace calls to `(which cmd-name)` (lines 487, 622, 133
 
 **File:** `src/gsh/environment.sls`
 
-**Problem:** The `env-get` function (lines 389-431) performs **two separate hash-table lookups** to retrieve a variable: first `find-var-in-chain` (recursive through parent scopes), then `env-get-chain`. Every `$variable` expansion hits this.
-
-**Fix:** Merge into a single-pass lookup that returns the value directly:
+**Problem:** The `env-get` function (lines 389-433) already has fast-path handling for special variables (`$?`, `$$`, `$#`, `$0`, `$@`, `$*`, `$-`, `$_`, `$RANDOM`, `$SECONDS`, `$LINENO`, and positional `$1`-`$N`). However, for ordinary variables, the `else` branch (lines 428-433) performs **two separate scope-chain traversals**:
 
 ```scheme
-;; Replace the double-lookup pattern with a single recursive search
-;; that returns the value (not the shell-var struct) when only the
-;; string value is needed (the common case in expand-simple-var).
+[else
+ (let ([resolved (resolve-nameref name env)])
+   (let ([var (find-var-in-chain env resolved)])     ;; 1st: walk chain, hash-get at each scope
+     (if (and var (shell-var-nameref? var))
+         #f
+         (env-get-chain env resolved))))]             ;; 2nd: walk chain AGAIN, hash-get at each scope
 ```
 
-Specifically, add a `env-get-value` fast path that short-circuits directly to the value string without going through `shell-var-value` after a second lookup:
+- **First traversal** (`find-var-in-chain`, line 955): walks the scope chain calling `hash-get` at each level to find the `shell-var` struct, checking for the nameref flag.
+- **Second traversal** (`env-get-chain`, line 439): walks the same scope chain again calling `hash-get` at each level to extract the value.
+
+For non-nameref variables (the overwhelming majority), the second traversal duplicates the work of the first.
+
+**Fix:** Merge into a single-pass lookup:
 
 ```scheme
-(define (env-get-value env name default)
-  ;; Single-pass: walk chain, return value string directly
-  (let loop ([e env])
-    (if (not e)
-      default
-      (let ([v (hash-get (shell-environment-vars e) name)])
-        (if v
-          (shell-var-value v)
-          (loop (shell-environment-parent e)))))))
+[else
+ (let ([resolved (resolve-nameref name env)])
+   (let ([var (find-var-in-chain env resolved)])
+     (cond
+       [(not var)
+        ;; Not in any scope — check process environment
+        (getenv resolved #f)]
+       [(and (shell-var-nameref? var)
+             (not (eq? var (find-var-in-chain env name))))
+        ;; Circular nameref — already resolved, still nameref
+        #f]
+       [(eq? (shell-var-value var) +unset-sentinel+)
+        #f]
+       [else
+        (shell-var-scalar-value var)])))]
 ```
 
-Use `env-get-value` in `expand-simple-var` (the hottest caller) instead of `(env-get env name)` followed by value extraction.
+This eliminates the second scope-chain traversal entirely by extracting the value from the struct already found by `find-var-in-chain`.
 
-**Expected gain:** Halves the hash table lookups for variable expansion. Since `$var` expansion is called on every word, this is one of the highest-frequency operations. Estimated **+5-10%** on variable-heavy scripts.
+**Expected gain:** Halves hash-table lookups for ordinary variable expansion. Since `$var` expansion is one of the highest-frequency operations, estimated **+3-8%** on variable-heavy scripts.
 
 ---
 
-### 2.3 — Cache Compiled `pregexp` Patterns
+### 2.3 — Cache Compiled Glob/Regex Patterns
 
-**File:** `src/gsh/expander.sls`
+**Files:** `src/gsh/glob.sls`, `src/gsh/executor.sls`
 
-**Problem:** The parameter expansion operators (`${var%pat}`, `${var#pat}`, `${var/pat/rep}`, etc.) compile regex patterns on every use via `pregexp-compat`. Each call to `(pregexp-compat pattern)` allocates a new compiled regex object even when the pattern is a string literal.
+**Problem:** The shell's pattern matching (used in `${var%pat}`, `${var#pat}`, `case` statements, `[[` conditionals) compiles glob patterns to regex via `glob-pattern->pregexp` and then calls `pregexp-match`. The compilation happens fresh each time, even when the same pattern appears in a loop:
 
-**Fix:** Add an LRU-style pattern cache (or simple hash) at module level:
+- `glob.sls:97,104,110` — `pregexp-match` calls in glob matching
+- `executor.sls:953` — `pregexp-match` in `case`/`[[` pattern matching
+
+**Fix:** Add a compiled-pattern cache at the glob module level:
 
 ```scheme
-;; At module level in expander.sls:
-(define *pattern-cache* (make-hashtable equal-hash equal?))
-(define *pattern-cache-max* 64)
+(define *glob-rx-cache* (make-hashtable string-hash string=?))
+(define *glob-rx-cache-max* 64)
 
-(define (pregexp-cached pattern)
-  (or (hashtable-ref *pattern-cache* pattern #f)
-      (let ((compiled (pregexp-compat pattern)))
-        (when (< (hashtable-size *pattern-cache*) *pattern-cache-max*)
-          (hashtable-set! *pattern-cache* pattern compiled))
-        compiled)))
+(define (glob-pattern->pregexp/cached pattern flags)
+  (let* ([key (cons pattern flags)]
+         [cached (hashtable-ref *glob-rx-cache* key #f)])
+    (or cached
+        (let ([compiled (glob-pattern->pregexp pattern flags)])
+          (when (< (hashtable-size *glob-rx-cache*) *glob-rx-cache-max*)
+            (hashtable-set! *glob-rx-cache* key compiled))
+          compiled))))
 ```
 
-Replace `(pregexp-compat pattern)` calls in `pattern-substitute-first`, `pattern-substitute-all`, `expand-parameter-content` with `(pregexp-cached pattern)`.
+**Expected gain:** High for scripts that use string operators or `case` in loops (e.g., `${var%.*}` on many files). Negligible for scripts that don't use pattern matching.
 
-**Expected gain:** High for scripts that use string operators in loops (e.g., `${var%.*}` on many files). Eliminates repeated regex compilation for the same pattern.
-
----
-
-### 2.4 — Replace `parameterize` in Main Execution Loop
-
-**File:** `src/gsh/executor.sls` (line 206), `src/gsh/control.sls` (lines 120, 133)
-
-**Problem:** `parameterize` in Chez saves/restores parameter values using procedure calls (parameters are implemented as procedures with closure cells). The hot paths in the shell call `parameterize` on **every command execution** and **every loop test**.
-
-Key offenders identified:
-- `executor.sls:206` — `(parameterize ([*procsub-cleanups* '()])` wraps entire command expansion
-- `control.sls:133` — `(parameterize ([*in-condition-context* #t])` wraps every while-test execution
-- `expander.sls:2020,2355,2366` — `(parameterize ([*in-dquote-context* #t])` on every double-quoted expansion
-
-**Fix:** Convert performance-critical parameters to explicit state passed as function arguments where possible. For `*in-condition-context*`, since it only affects error handling, consider checking it only at the error site (lazy check) rather than setting it on every test entry.
-
-For `*in-dquote-context*`: add an extra boolean argument `in-dquote?` to `expand-string-segments` and its callees instead of using a dynamic parameter. This avoids the parameter save/restore overhead on every quoted string expansion.
-
-For `*procsub-cleanups*`: since process substitutions are rare, keep the parameterize but add a fast-path check: only enter the parameterize if the word list actually contains `<(...)` or `>(...)` tokens (check during parsing, set a flag on the AST node).
-
-**Expected gain:** Difficult to quantify without profiling, but `parameterize` creates a measurable overhead in tight loops. Based on the `optimization.md §8` guidance, compat wrappers blocking cp0 are a major issue. Estimated **+3-8%** on loop-heavy workloads.
+**Note:** The original document incorrectly claimed `pregexp-compat` was used directly in `expander.sls` and referenced non-existent functions `pattern-substitute-first`, `pattern-substitute-all`, and `expand-parameter-content`. The actual pattern matching goes through `glob.sls`.
 
 ---
 
-### 2.5 — Convert Hot Compat Wrappers to `define-syntax`
+### 2.4 — Reduce `parameterize` Overhead in Hot Paths
 
-**File:** `src/compat/gambit.sls`, `~/mine/jerboa/lib/jerboa/runtime.sls`
+**Files:** `src/gsh/executor.sls`, `src/gsh/control.sls`, `src/gsh/expander.sls`
 
-**Problem:** Per `optimization.md §8`, when the compat layer wraps Chez primitives with `define` functions (e.g., `hash-ref` wrapping `hashtable-ref`), cp0 cannot see through them to apply its primitive-specific optimizations (inline bounds checks, type specialization, etc.).
+**Problem:** `parameterize` in Chez saves/restores parameter values on entry/exit. It's cheap individually but adds up when called on **every command execution** and **every loop iteration**.
 
-**Hot wrappers to convert:**
+Key offenders (verified):
+- `executor.sls:206` — `(parameterize ([*procsub-cleanups* (list)])` wraps every simple command
+- `control.sls:46,133,198` — `(parameterize ([*in-condition-context* #t])` wraps every if/while/until test
+- `expander.sls:2020,2355,2366` — `(parameterize ([*in-dquote-context* ...])` wraps quoted string expansion
 
-In `gambit.sls`:
+**Fix strategies:**
+
+1. **`*procsub-cleanups*`**: Process substitutions (`<(...)`, `>(...)`) are rare. Add a fast-path: only enter the `parameterize` if the word list actually contains process substitution tokens. Check during parsing and set a flag on the AST node.
+
+2. **`*in-condition-context*`**: Only affects error-reporting behavior. Convert to an explicit boolean argument threaded through `execute-fn` calls, avoiding dynamic parameter overhead.
+
+3. **`*in-dquote-context*`**: Add an `in-dquote?` boolean argument to `expand-string-segments` and its callees instead of using a dynamic parameter. This is more invasive but eliminates parameter save/restore on every quoted string.
+
+**Expected gain:** Estimated +2-5% on loop-heavy workloads. The `*procsub-cleanups*` fast-path alone is a small, safe change with guaranteed improvement.
+
+---
+
+### 2.5 — Convert `hash-get` Wrapper to `define-syntax`
+
+**File:** `~/mine/jerboa/lib/jerboa/runtime.sls`
+
+**Problem:** The `hash-get` function wraps `hashtable-ref` with a hardcoded default:
+
 ```scheme
-;; BEFORE (opaque to cp0):
+;; runtime.sls:111-112
+(define (hash-get ht key)
+  (hashtable-ref ht key #f))
+```
+
+Per `optimization.md §8`, when the compat layer wraps Chez primitives with `define` functions, the wrapper obscures the primitive's optimization flags (`pure`, `unrestricted`, `cp02`, etc.) from cp0.
+
+Note: `hash-put!` is already a direct alias (`(define hash-put! hashtable-set!)`), which cp0 CAN optimize through with WPO. No change needed for `hash-put!`.
+
+**Fix:** Convert `hash-get` to a macro:
+
+```scheme
+(define-syntax hash-get
+  (syntax-rules ()
+    ((_ ht key) (hashtable-ref ht key #f))))
+```
+
+Similarly in `gambit.sls`, the u8vector aliases are direct `define` aliases:
+```scheme
+;; gambit.sls:151-155
 (define u8vector-ref bytevector-u8-ref)
 (define u8vector-length bytevector-length)
 (define u8vector-set! bytevector-u8-set!)
+```
 
-;; AFTER (transparent to cp0 — treated as if calling bytevector-u8-ref directly):
+Direct aliases are generally transparent to cp0 with WPO (the compiler can see the alias chain). Converting these to `define-syntax` is lower priority but ensures transparency even without WPO:
+
+```scheme
 (define-syntax u8vector-ref
   (syntax-rules () ((_ bv i) (bytevector-u8-ref bv i))))
-(define-syntax u8vector-length
-  (syntax-rules () ((_ bv) (bytevector-length bv))))
-(define-syntax u8vector-set!
-  (syntax-rules () ((_ bv i v) (bytevector-u8-set! bv i v))))
 ```
 
-In `runtime.sls`, the hash wrappers:
-```scheme
-;; BEFORE:
-(define (hash-get ht key) (hashtable-ref ht key #f))
-(define (hash-put! ht key val) (hashtable-set! ht key val))
+**Caveats:** `define-syntax` aliases break when used as first-class values (e.g., `(map hash-get list-of-hts)` won't work). Audit all uses of `hash-get` to ensure it's never passed as a value. If it is, keep a procedure version under a different name for those call sites.
 
-;; AFTER:
-(define-syntax hash-get
-  (syntax-rules () ((_ ht key) (hashtable-ref ht key #f))))
-(define-syntax hash-put!
-  (syntax-rules () ((_ ht key val) (hashtable-set! ht key val))))
-```
-
-**Caveats:** Only applies when the wrapper is a literal alias (same arity, no extra logic). Wrappers with runtime logic (error checks, optional args) must remain as procedures. Test each conversion — `define-syntax` aliases break when used as first-class values (e.g., `(map hash-get ...)` won't work; need a wrapper lambda at the call site).
-
-**Expected gain:** Per `optimization.md §8`, these are "likely the hottest paths." The hash operations (`hash-get`, `hash-put!`) are called thousands of times per command execution for variable/alias/function lookups. Estimated **+5-10%** on overall execution.
+**Expected gain:** Estimated +3-5% overall. `hash-get` is called on virtually every variable lookup, alias check, and function lookup.
 
 ---
 
-### 2.6 — Inline Special Variable Lookups
-
-**File:** `src/gsh/expander.sls` — `expand-simple-var` and `expand-dollar`
-
-**Problem:** Special shell variables (`$?`, `$$`, `$#`, `$0`, `$1`…`$9`, `$-`, `$!`) go through the same hash-table lookup chain as ordinary variables, hitting `env-get` which walks the scope chain and calls `hash-get` on each scope.
-
-**Fix:** Add a fast-path `cond` before the general `env-get` call that dispatches directly to the environment record accessors:
-
-```scheme
-(define (expand-special-var name env)
-  (cond
-    [(string=? name "?")  (number->string (shell-environment-last-status env))]
-    [(string=? name "$")  (number->string (shell-environment-shell-pid env))]
-    [(string=? name "!")  (let ([p (shell-environment-last-bg-pid env)])
-                            (if p (number->string p) ""))]
-    [(string=? name "#")  (number->string (length (shell-environment-positional env)))]
-    [(string=? name "-")  (get-option-flags env)]
-    [(string=? name "0")  (shell-environment-shell-name env)]
-    [else                  #f]))  ;; #f = fall through to general lookup
-```
-
-Call this before `env-get` in `expand-simple-var`. If it returns `#f`, proceed with the hash-table lookup. Since `$?` is checked after every command and `$$` appears in many scripts, this eliminates multiple hash lookups for the most common special variables.
-
-**Expected gain:** Modest but guaranteed improvement on scripts that check `$?` frequently (e.g., `if [ $? -ne 0 ]` after every command).
-
----
-
-### 2.7 — Switch `execute-while` / `execute-for` to Use Explicit `env-get-value` for Loop Variables
+### 2.6 — Fast Local-Set for For-Loop Variables
 
 **File:** `src/gsh/control.sls`
 
-**Problem:** The for-loop body repeatedly calls `(env-set! env var-name (car remaining))` (line 75) and the while-loop test re-evaluates the condition. The env-set! path does a full hash-table write + scope-chain traversal even for loop-local variables.
+**Problem:** The for-loop body (line 75) calls `(env-set! env var-name (car remaining))` on every iteration. `env-set!` traverses the scope chain and propagates flags, which is unnecessary for a plain loop iteration variable that is always local.
 
-**Optimization:** For the `for` loop specifically, the loop variable is always a local write to the innermost scope. Add a fast `local-set!` path that directly writes to the current scope's hash table without chain traversal:
+**Fix:** Add a fast `local-set!` path that writes directly to the current scope:
 
 ```scheme
 ;; Fast path for for-loop variable (always set in current scope):
@@ -334,58 +336,37 @@ Call this before `env-get` in `expand-simple-var`. If it returns `#f`, proceed w
            (make-shell-var value #f #f #t #f #f #f #f #f #f))
 ```
 
-This bypasses `env-set!`'s scope-chain traversal and flag-propagation logic, which are unnecessary for plain loop iteration variables.
+Or better, reuse the existing `shell-var` struct and just update its value field to avoid allocation on every iteration:
+
+```scheme
+(let ([existing (hash-get (shell-environment-vars env) var-name)])
+  (if existing
+      (shell-var-value-set! existing (car remaining))
+      (hash-put! (shell-environment-vars env) var-name
+                 (make-shell-var (car remaining) #f #f #t #f #f #f #f #f #f))))
+```
+
+**Expected gain:** Small but guaranteed improvement for `for` loops. Eliminates scope-chain traversal and flag propagation on each iteration.
 
 ---
 
 ## Part 3: Architectural Improvements
 
-### 3.1 — Use `define-record-type` with `(sealed #t)` for Core Structs
+### 3.1 — Replace Polling in `jobs.sls` with Blocking `waitpid`
 
-**Files:** Any `.sls` with performance-critical defstruct usage (likely generated by gherkin)
+**File:** `src/gsh/jobs.sls`
 
-**Per `optimization.md §2`:** Chez's `define-record-type` with `(sealed #t)` enables direct field access without vtable lookup. The gherkin compiler currently emits MOP-based struct wrappers that add an indirection layer.
+**Problem:** The job-wait loops use `(thread-sleep! delay)` + `(thread-yield!)` polling. From strace: gerbil-sh uses `pselect6` (efficient signal-driven wait) while jerboa-sh uses repeated `wait4` + `clock_nanosleep`. This inflates real time significantly for external commands.
 
-For the most performance-critical structs (those accessed in the hot execution path):
-- `shell-var` (accessed on every variable read/write)
-- `lexer` state (accessed on every token)
-- AST node types (`simple-command`, `cond-command`, etc.)
+Verified polling sites:
+- Lines 351-352: `wait-for-foreground-process-raw` — `(thread-sleep! delay)` + `(thread-yield!)`
+- Lines 381-382: `wait-for-foreground-process` — same pattern
+- Line 458: `job-wait` — `(thread-sleep! delay)`
+- Lines 495,498: `job-wait-any` — `(thread-yield!)` + `(thread-sleep! 0.001)`
 
-Consider emitting these as native Chez records with `(sealed #t)` and `(nongenerative <uid>)` in the gherkin compiler output, bypassing the MOP for field access.
+The existing FFI functions are `ffi-waitpid-pid` and `ffi-waitpid-status` (called at lines 281-285, 339, 344, 369, 374, 429, 434, 520, 534). They currently pass `WNOHANG|WUNTRACED`, making them non-blocking.
 
-This is a gherkin compiler change, not a jerboa-shell change, but it would benefit all gherkin-compiled projects.
-
-### 3.2 — Selective WPO for Pure Modules
-
-**Per `optimization.md §6, §17`:** WPO gave the biggest single gains in the gherkin-shell benchmarks (+4-5% on top of opt-3). The current build already uses WPO via `compile-whole-program`. Verify it is actually incorporating all modules:
-
-```scheme
-;; In build-binary.ss, check the return value of compile-whole-program:
-(let ((missing (compile-whole-program "gsh.wpo" "gsh-all.so")))
-  (unless (null? missing)
-    (printf "WARNING: ~a modules NOT incorporated into WPO:~n" (length missing))
-    (for-each (lambda (lib) (printf "  ~a~n" lib)) missing)))
-```
-
-If jerboa runtime modules (`jerboa/runtime`, `jerboa/core`, `std/misc/thread`) are listed as missing (no `.wpo` file), rebuild them with `(generate-wpo-files #t)` in their own build scripts. Each missing `.wpo` file is a missed cross-library optimization opportunity.
-
-### 3.3 — Reduce Library Boundary Fragmentation
-
-**Problem:** The gherkin compiler emits each Gerbil module as a separate R6RS library. With 28+ modules each importing from each other, Chez has many library boundary crossings to optimize across. Even with `enable-cross-library-optimization`, this has limits.
-
-**Fix:** Consider combining closely-coupled, small modules into single `.sls` files before compilation:
-- `(gsh ast)` + `(gsh registry)` + `(gsh macros)` → one library
-- `(gsh util)` → inline into `(gsh executor)` (only large consumer)
-
-Fewer library boundaries = more inlining opportunities for cp0.
-
-### 3.4 — Replace Polling in `jobs.sls` with `waitpid(WNOHANG)`
-
-**File:** `src/gsh/jobs.sls` (lines 351-352, 381-382, 458, 495, 498)
-
-**Problem:** The job-wait loops use `(thread-sleep! delay)` + `(thread-yield!)` polling. From the strace: gerbil-sh uses `pselect6` (efficient signal-driven wait) while jerboa-sh uses repeated `wait4` + `clock_nanosleep`. This makes jerboa-sh spend significantly more real time waiting.
-
-**Fix:** Replace the polling loops with proper blocking `waitpid(WUNTRACED)` via FFI, only falling back to polling when non-blocking is needed for background jobs:
+**Fix:** For foreground process waiting, call `ffi-waitpid-pid` with `options=WUNTRACED` (without `WNOHANG`) to block until the child changes state, eliminating the poll loop entirely:
 
 ```scheme
 ;; Instead of:
@@ -393,11 +374,64 @@ Fewer library boundaries = more inlining opportunities for cp0.
 ;;   (thread-yield!)
 ;;   (poll-again)
 
-;; Use:
-;;   (ffi-waitpid-blocking pid)  ;; blocks until child state changes
+;; Use blocking wait:
+(let ([result (ffi-waitpid-pid pid WUNTRACED)])  ;; blocks until state change
+  (when (> result 0)
+    (let ([raw-status (ffi-waitpid-status)])
+      ...)))
 ```
 
-This matches the gerbil-sh model where `pselect6`/`signalfd` efficiently block rather than spin. The `ffi-do-waitpid` function already exists in the C shim (`ffi_do_waitpid`); call it with `options=0` for blocking wait instead of `options=WNOHANG`.
+Keep `WNOHANG` polling only for background job status checking where blocking would be inappropriate.
+
+**Expected gain:** Estimated +10-20% real time on scripts that invoke external commands. Eliminates the sleep/poll overhead entirely for foreground commands.
+
+**Risk:** Blocking `waitpid` in the main thread may interfere with signal handling or interactive features. Test thoroughly with job control scenarios (Ctrl-Z, bg, fg).
+
+---
+
+### 3.2 — Verify WPO Module Coverage
+
+The build already uses `compile-whole-program` (build-binary.ss:100). The code already reports missing WPO modules:
+
+```scheme
+(let ((missing (compile-whole-program "gsh.wpo" "gsh-all.so")))
+  (unless (null? missing)
+    (printf "  WPO: ~a libraries not incorporated (missing .wpo):~n" (length missing))
+    (for-each (lambda (lib) (printf "    ~a~n" lib)) missing)))
+```
+
+Per `optimization.md §6, §17`, WPO gave the biggest single gains in the gherkin-shell benchmarks (+4-5% on top of opt-3).
+
+**Action:** Run a build and check the output for missing WPO libraries. If jerboa runtime modules (`jerboa/runtime`, `jerboa/core`, `std/misc/thread`) appear in the missing list, rebuild them with `(generate-wpo-files #t)`. Each missing `.wpo` file is a missed cross-library optimization opportunity.
+
+---
+
+### 3.3 — Reduce Library Boundary Fragmentation
+
+**Problem:** The gherkin compiler emits each Gerbil module as a separate R6RS library. With 28+ modules importing from each other, Chez has many library boundaries to optimize across. Even with WPO, cross-library optimization has limits.
+
+**Fix:** Consider combining closely-coupled, small modules into single `.sls` files:
+- `(gsh ast)` + `(gsh registry)` + `(gsh macros)` -> one library
+- `(gsh util)` -> inline into `(gsh executor)` (primary consumer)
+
+Fewer library boundaries = more inlining opportunities for cp0.
+
+**Risk:** Medium. Module merging may introduce circular dependency issues and makes the codebase harder to maintain. Only worth it if profiling confirms cross-library call overhead is significant.
+
+---
+
+### 3.4 — Use `define-record-type` with `(sealed #t)` for Core Structs
+
+**Problem:** Per `optimization.md §2`, the gherkin compiler emits MOP-based struct wrappers. Chez's `define-record-type` with `(sealed #t)` enables direct field access without vtable lookup.
+
+For the most performance-critical structs:
+- `shell-var` (accessed on every variable read/write)
+- `shell-environment` (accessed on every scope operation)
+- AST node types (`simple-command`, `cond-command`, etc.)
+
+Consider emitting these as native Chez records with `(sealed #t)` and `(nongenerative <uid>)` in the gherkin compiler output.
+
+This is a gherkin compiler change, not a jerboa-shell change, and would benefit all gherkin-compiled projects.
 
 ---
 
@@ -405,7 +439,7 @@ This matches the gerbil-sh model where `pselect6`/`signalfd` efficiently block r
 
 ### Benchmark Protocol
 
-Run each optimization step independently to measure its contribution. Use this script:
+Run each optimization step independently to measure its contribution:
 
 ```bash
 #!/bin/bash
@@ -417,8 +451,8 @@ for test in \
   'i=0; while [ "$i" -lt 5000 ]; do x=$((i*3+1)); i=$((i+1)); done' \
   'f() { :; }; i=0; while [ "$i" -lt 5000 ]; do f; i=$((i+1)); done'
 do
-  echo -n "jerboa: "; time (echo "$test" | jerboa-sh 2>/dev/null) 2>&1 | grep real
-  echo -n "gerbil: "; time (echo "$test" | gerbil-sh 2>/dev/null) 2>&1 | grep real
+  echo -n "jerboa: "; { time echo "$test" | ./gsh 2>/dev/null ; } 2>&1 | grep real
+  echo -n "gerbil: "; { time echo "$test" | gerbil-shell/.gerbil/bin/gsh 2>/dev/null ; } 2>&1 | grep real
   echo "---"
 done
 ```
@@ -428,30 +462,28 @@ done
 After each binary rebuild, verify syscall counts are decreasing:
 
 ```bash
-strace -f -c timeout 10 jerboa-sh -c \
+strace -f -c timeout 10 ./gsh -c \
   'i=0; while [ "$i" -lt 2000 ]; do :; i=$((i+1)); done' 2>&1 | \
-  grep -E 'clock_nanosleep|getdents|openat|write|total'
+  grep -E 'clock_nanosleep|wait4|openat|total'
 ```
 
 Target after Part 1 changes:
-- `clock_nanosleep`: from ~8000/2k-iters → **0** (thread-yield! no-op)
-- `getdents64`: from ~4000/2k-iters → **< 10** (only at startup)
+- `clock_nanosleep`: from ~6000/2k-iters -> **0** (thread-yield! no-op)
 
 ### Profiling the Remaining Overhead
 
-After Part 1 and 2 changes, profile with Chez's built-in profiler to find remaining hotspots:
+After Part 1 and 2 changes, profile with Chez's built-in profiler:
 
 ```scheme
-;; Run in scheme with the shell libraries loaded:
+;; In build-binary.ss or a separate profiling script,
+;; compile with (generate-profile-forms #t), then:
 (profile-clear)
-(profile-start)
 ;; ... run a benchmark script ...
-(profile-stop)
 (profile-dump-data "gsh-profile.dat")
 (profile-dump-html "gsh-profile.html")
 ```
 
-Or use Chez's `##get-call-stack` for sampling-based profiling. The remaining overhead is likely concentrated in `expand-string-segments` and `env-get`.
+The remaining overhead is likely concentrated in `expand-string-segments`, `env-get`, and `execute-simple-command`.
 
 ---
 
@@ -459,27 +491,47 @@ Or use Chez's `##get-call-stack` for sampling-based profiling. The remaining ove
 
 | Optimization | Estimated Gain | Confidence |
 |-------------|---------------|------------|
-| 1.1 thread-yield! no-op | +2-5% real time (eliminates sleep overhead) | High |
-| 1.2 Build params (commonization, unsafe-apply, debug-level 0) | +5-8% | High (per optimization.md §17) |
-| 1.3 Per-module cp0 budget increase | +2-4% on hot modules | Medium |
-| 2.1 PATH lookup cache | +10-20% for external-command scripts | High |
-| 2.2 env-get single-pass | +5-10% on variable-heavy scripts | Medium |
-| 2.3 pregexp cache | +10-30% on string-op scripts | High |
-| 2.4 Reduce parameterize | +3-8% on loop-heavy scripts | Medium |
-| 2.5 define-syntax wrappers | +5-10% overall | Medium |
-| 2.6 Special var fast-path | +1-3% | Low |
-| 3.4 Blocking waitpid | +10-20% real time on external commands | High |
+| 1.1 thread-yield! no-op | +2-5% real time | **High** — verified via strace |
+| 1.2 Build params (commonization, unsafe-apply, debug-level 0) | +5-8% | **Medium** — parameters exist but gains depend on code patterns |
+| 1.3 Per-module cp0 budget increase | +2-4% | **Low** — may already be sufficient |
+| 2.1 PATH lookup cache | +5-15% for external-command scripts | **High** — eliminates filesystem syscalls |
+| 2.2 env-get single-pass | +3-8% on variable-heavy scripts | **Medium** — depends on scope depth |
+| 2.3 Glob pattern cache | +5-15% on pattern-heavy scripts | **Medium** — depends on pattern reuse |
+| 2.4 Reduce parameterize | +2-5% on loop-heavy scripts | **Low** — parameterize is already cheap |
+| 2.5 hash-get define-syntax | +3-5% overall | **Medium** — high frequency, small per-call |
+| 2.6 Fast local-set for loops | +1-2% | **Low** — small improvement |
+| 3.1 Blocking waitpid | +10-20% real time on external commands | **High** — eliminates poll loops |
 
-**Combined target:** Bring jerboa-sh to **within 1.1–1.2× of gerbil-sh** (from current 1.4–1.7×). Full parity is unlikely without replacing the Gambit→Chez shim layers with native Chez equivalents.
+**Combined target:** Bring jerboa-sh to **within 1.1-1.3x of gerbil-sh** (from current 1.4-1.7x). Full parity is unlikely without replacing the Gambit->Chez shim layers with native Chez equivalents.
 
 ---
 
 ## Quick Start: Highest-ROI Steps First
 
-1. **`thread-yield! → void`** in `~/mine/jerboa/lib/std/misc/thread.sls` (5-minute change, rebuild)
-2. **Add build params** to `build-binary.ss` (2-minute change, rebuild binary)
-3. **PATH cache** in `src/gsh/util.sls` (1-hour change, test, rebuild)
-4. **define-syntax wrappers** for hash-get/hash-put! in runtime.sls (2-hour change, rebuild jerboa + gsh)
-5. **pregexp cache** in expander.sls (30-minute change)
-6. **env-get single-pass** in environment.sls (1-hour change)
-7. **Blocking waitpid** in jobs.sls (2-hour change + C shim update)
+1. **`thread-yield! -> void`** in `~/mine/jerboa/lib/std/misc/thread.sls` — trivial change, rebuild jerboa then gsh
+2. **Add build params** to `build-binary.ss` — trivial change, rebuild binary
+3. **Blocking waitpid** in `jobs.sls` — replace WNOHANG with blocking wait for foreground processes
+4. **PATH cache** in `src/gsh/util.sls` — add `which-cached`, update executor.sls call sites
+5. **`hash-get` define-syntax** in `~/mine/jerboa/lib/jerboa/runtime.sls` — rebuild jerboa then gsh
+6. **env-get single-pass** in `environment.sls` — merge find-var-in-chain + env-get-chain
+7. **Reduce parameterize** — fast-path `*procsub-cleanups*` first (smallest, safest change)
+
+---
+
+## Corrections from Original Document
+
+This document was revised after verifying all claims against the actual codebase. Key corrections:
+
+1. **Section 2.6 (Special Variable Lookups) removed**: `env-get` already has fast-path handling for `$?`, `$$`, `$#`, `$0`, `$@`, `$*`, `$-`, `$_`, `$RANDOM`, `$SECONDS`, `$LINENO`, and positional `$1`-`$N` (environment.sls:389-427). The original document proposed adding what already exists.
+
+2. **Section 2.3 (pregexp cache) corrected**: The original claimed `pregexp-compat` was used in `expander.sls` functions `pattern-substitute-first`, `pattern-substitute-all`, and `expand-parameter-content`. None of these functions exist. The actual pattern matching goes through `glob.sls` (lines 97, 104, 110) and `executor.sls` (line 953).
+
+3. **Section 2.5 (hash-put!) corrected**: The original showed `hash-put!` as `(define (hash-put! ht key val) (hashtable-set! ht key val))` — a procedure wrapper. It is actually `(define hash-put! hashtable-set!)` — a direct alias that cp0 can already optimize through. Only `hash-get` benefits from the define-syntax conversion.
+
+4. **Section 3.4 (waitpid) corrected**: The original referenced a non-existent `ffi-do-waitpid` / `ffi_do_waitpid`. The actual FFI functions are `ffi-waitpid-pid` (returns PID) and `ffi-waitpid-status` (returns status), used at 9 call sites in jobs.sls.
+
+5. **References to `docs/optimization.md` restored**: Section references now correctly cite the actual sections (e.g., `§8` = Primitive Inlining Flags, `§12` = Complete Parameter Reference, `§14` = Commonization, `§17` = Empirical Results).
+
+6. **Profiling suggestion corrected**: The original suggested `##get-call-stack`, which is a Gambit primitive, not available in Chez. Replaced with Chez's actual profiling API (`generate-profile-forms`, `profile-dump-html`).
+
+7. **Gain estimates moderated**: Original estimates were overly optimistic in places (e.g., "+10-30% for pregexp cache"). Revised to more realistic ranges based on actual code patterns and frequency analysis.
