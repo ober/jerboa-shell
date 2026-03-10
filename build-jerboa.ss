@@ -79,7 +79,9 @@
     ;; Jerboa runtime provides: hash tables, keywords, errors, utilities
     ;; Exclude method dispatch (bind-method!, call-method) — MOP's version
     ;; must be used since MOP's make-instance uses class-type-methods table
-    (except (jerboa runtime) bind-method! call-method ~)
+    ;; Exclude void — (jerboa runtime) re-exports Chez's 0-arg void,
+    ;; but Gerbil's void is variadic.  Let (compat gambit)'s version win.
+    (except (jerboa runtime) bind-method! call-method ~ void)
     ;; Gherkin MOP: make-class-type, object::t, slot-ref/set!, class predicates
     ;; The Gherkin compiler emits calls to these for every defstruct/defclass.
     ;; TODO: Port MOP into jerboa to eliminate this gherkin dependency

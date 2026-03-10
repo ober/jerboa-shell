@@ -254,23 +254,36 @@
   (define-record-type file-info-rec
     (fields type size mode device inode owner group mtime atime))
 
+  ;; FFI stat: use the C ffi_file_type to avoid opening files (FIFOs would block)
+  (define c-ffi-file-type
+    (foreign-procedure "ffi_file_type" (string int) int))
+  (define c-ffi-file-size
+    (foreign-procedure "ffi_file_size" (string) long-long))
+  (define c-ffi-file-mtime
+    (foreign-procedure "ffi_file_mtime" (string) long-long))
+  (define c-ffi-file-mode
+    (foreign-procedure "ffi_file_mode" (string) int))
+
+  (define (file-type-int->symbol n)
+    (case n
+      ((0) 'regular) ((1) 'directory) ((2) 'symbolic-link)
+      ((3) 'fifo) ((4) 'block-special) ((5) 'character-special)
+      ((6) 'socket) (else 'unknown)))
+
   (define (file-info path . follow?)
-    (let ((follow (if (pair? follow?) (car follow?) #t)))
-      (let ((type (cond
-                    ((file-directory? path) 'directory)
-                    ((file-regular? path) 'regular)
-                    ((file-symbolic-link? path) 'symbolic-link)
-                    (else 'unknown)))
-            (size (guard (e (#t 0))
-                    (file-length (open-file-input-port path))))
-            (mtime (guard (e (#t (make-time 'time-utc 0 0)))
-                     (file-change-time path)))
-            (atime (guard (e (#t (make-time 'time-utc 0 0)))
-                     (file-access-time path))))
-        (make-file-info-rec type size 0
-          (string-hash path) (string-hash path)  ;; device/inode proxy
-          0 0                                     ;; owner/group (need real stat for these)
-          mtime atime))))
+    (let* ((follow (if (pair? follow?) (car follow?) #t))
+           (type-int (c-ffi-file-type path (if follow 1 0))))
+      (if (= type-int -1)
+        (error 'file-info "cannot stat file" path)
+        (let ((type (file-type-int->symbol type-int))
+              (size (c-ffi-file-size path))
+              (mtime-secs (c-ffi-file-mtime path))
+              (mode (c-ffi-file-mode path)))
+          (make-file-info-rec type (if (< size 0) 0 size) mode
+            0 0     ;; device/inode — use real stat if needed
+            0 0     ;; owner/group
+            (make-time 'time-utc 0 (if (< mtime-secs 0) 0 mtime-secs))
+            (make-time 'time-utc 0 0))))))
 
   (define file-info-type file-info-rec-type)
   (define file-info-size file-info-rec-size)

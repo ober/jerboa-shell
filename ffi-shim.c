@@ -447,7 +447,9 @@ int ffi_fdwrite(int fd, const char *buf, int count) {
 
 /* ========== Stat ========== */
 
-/* Returns file type as int: 0=regular, 1=directory, 2=symlink, 3=fifo, 4=other, -1=error */
+/* Returns file type as int:
+   0=regular, 1=directory, 2=symlink, 3=fifo,
+   4=block-special, 5=character-special, 6=socket, 7=other, -1=error */
 int ffi_file_type(const char *path, int follow_links) {
     struct stat st;
     int rc = follow_links ? stat(path, &st) : lstat(path, &st);
@@ -456,7 +458,42 @@ int ffi_file_type(const char *path, int follow_links) {
     if (S_ISDIR(st.st_mode)) return 1;
     if (S_ISLNK(st.st_mode)) return 2;
     if (S_ISFIFO(st.st_mode)) return 3;
-    return 4;
+    if (S_ISBLK(st.st_mode)) return 4;
+    if (S_ISCHR(st.st_mode)) return 5;
+    if (S_ISSOCK(st.st_mode)) return 6;
+    return 7;
+}
+
+/* Full stat info: returns 0 on success, -1 on error.
+   Results returned via out array: [mode, uid, gid, dev, ino, nlink, atime] */
+int ffi_stat(const char *path, int follow_links,
+             long long *out_size, long long *out_mtime,
+             int *out_type, int *out_mode,
+             int *out_uid, int *out_gid,
+             long long *out_dev, long long *out_ino, long long *out_nlink) {
+    struct stat st;
+    int rc = follow_links ? stat(path, &st) : lstat(path, &st);
+    if (rc != 0) return -1;
+
+    *out_size = (long long)st.st_size;
+    *out_mtime = (long long)st.st_mtime;
+    *out_mode = (int)(st.st_mode & 07777);
+    *out_uid = (int)st.st_uid;
+    *out_gid = (int)st.st_gid;
+    *out_dev = (long long)st.st_dev;
+    *out_ino = (long long)st.st_ino;
+    *out_nlink = (long long)st.st_nlink;
+
+    if (S_ISREG(st.st_mode)) *out_type = 0;
+    else if (S_ISDIR(st.st_mode)) *out_type = 1;
+    else if (S_ISLNK(st.st_mode)) *out_type = 2;
+    else if (S_ISFIFO(st.st_mode)) *out_type = 3;
+    else if (S_ISBLK(st.st_mode)) *out_type = 4;
+    else if (S_ISCHR(st.st_mode)) *out_type = 5;
+    else if (S_ISSOCK(st.st_mode)) *out_type = 6;
+    else *out_type = 7;
+
+    return 0;
 }
 
 long long ffi_file_size(const char *path) {
