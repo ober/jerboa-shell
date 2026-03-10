@@ -263,6 +263,14 @@
     (foreign-procedure "ffi_file_mtime" (string) long-long))
   (define c-ffi-file-mode
     (foreign-procedure "ffi_file_mode" (string) int))
+  (define c-ffi-file-uid
+    (foreign-procedure "ffi_file_uid" (string) int))
+  (define c-ffi-file-gid
+    (foreign-procedure "ffi_file_gid" (string) int))
+  (define c-ffi-file-dev
+    (foreign-procedure "ffi_file_dev" (string) long-long))
+  (define c-ffi-file-ino
+    (foreign-procedure "ffi_file_ino" (string) long-long))
 
   (define (file-type-int->symbol n)
     (case n
@@ -280,8 +288,10 @@
               (mtime-secs (c-ffi-file-mtime path))
               (mode (c-ffi-file-mode path)))
           (make-file-info-rec type (if (< size 0) 0 size) mode
-            0 0     ;; device/inode — use real stat if needed
-            0 0     ;; owner/group
+            (let ((d (c-ffi-file-dev path))) (if (< d 0) 0 d))
+            (let ((i (c-ffi-file-ino path))) (if (< i 0) 0 i))
+            (let ((u (c-ffi-file-uid path))) (if (< u 0) 0 u))
+            (let ((g (c-ffi-file-gid path))) (if (< g 0) 0 g))
             (make-time 'time-utc 0 (if (< mtime-secs 0) 0 mtime-secs))
             (make-time 'time-utc 0 0))))))
 

@@ -513,3 +513,39 @@ int ffi_file_mode(const char *path) {
     if (stat(path, &st) != 0) return -1;
     return (int)(st.st_mode & 07777);
 }
+
+int ffi_file_uid(const char *path) {
+    struct stat st;
+    if (stat(path, &st) != 0) return -1;
+    return (int)st.st_uid;
+}
+
+int ffi_file_gid(const char *path) {
+    struct stat st;
+    if (stat(path, &st) != 0) return -1;
+    return (int)st.st_gid;
+}
+
+long long ffi_file_dev(const char *path) {
+    struct stat st;
+    if (stat(path, &st) != 0) return -1;
+    return (long long)st.st_dev;
+}
+
+long long ffi_file_ino(const char *path) {
+    struct stat st;
+    if (stat(path, &st) != 0) return -1;
+    return (long long)st.st_ino;
+}
+
+long long ffi_file_ino_lstat(const char *path) {
+    struct stat st;
+    if (lstat(path, &st) != 0) return -1;
+    return (long long)st.st_ino;
+}
+
+long long ffi_file_dev_lstat(const char *path) {
+    struct stat st;
+    if (lstat(path, &st) != 0) return -1;
+    return (long long)st.st_dev;
+}
