@@ -2,7 +2,7 @@
 ;; Entry point for jerboa-shell
 (import (chezscheme) (jsh main) (except (jsh builtins) list-head)
         (jsh registry) (jsh script) (jsh sandbox)
-        (only (jsh executor) *profile-mode* profile-reset! profile-get-data
+        (only (jsh executor) *jsh-profile-mode* profile-reset! profile-get-data
               ast->command-text)
         (only (jsh parser) parse-complete-command)
         (only (jsh ast) ast-pipeline? ast-pipeline-commands ast-pipeline-bang?)
@@ -455,7 +455,7 @@
               (if (pair? (cdr args))
                 (let* ((cmd-str (simple-join (cdr args) " ")))
                   (profile-reset!)
-                  (let ((status (parameterize ((*profile-mode* #t))
+                  (let ((status (parameterize ((*jsh-profile-mode* #t))
                                   (run-cmd cmd-str))))
                     (print-profile-report (profile-get-data)
                                           (string-append "-c " cmd-str))
@@ -465,7 +465,7 @@
              (else
               (let ((script (car args)))
                 (profile-reset!)
-                (let ((status (parameterize ((*profile-mode* #t))
+                (let ((status (parameterize ((*jsh-profile-mode* #t))
                                 (run-script script))))
                   (print-profile-report (profile-get-data) script)
                   (cons "" (if (integer? status) status 1)))))))]

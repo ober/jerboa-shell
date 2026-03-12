@@ -543,8 +543,8 @@
       "             [(shell-var-nameref? var) #f]\n"
       "             [else (shell-var-scalar-value var)])))])")))
   
-  ;; Rename *gsh-tier* to *jsh-tier* throughout all generated files  
-  (system "sed -i 's/\\*gsh-tier\\*/\\*jsh-tier\\*/g' src/jsh/*.sls")
-  (display "  Patched all .sls files (gsh-tier → jsh-tier)\n"))
+  ;; Rename all *gsh-* parameters to *jsh-* throughout all generated files  
+  (system "sed -i 's/\\*gsh-/\\*jsh-/g' src/jsh/*.sls")
+  (display "  Patched all .sls files (gsh-* → jsh-*)\n"))
 
 (display "\n=== Build complete ===\n")
