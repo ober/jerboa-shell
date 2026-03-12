@@ -57,7 +57,7 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (jsh ast) (jsh lexer))
+    (std sugar) (gsh ast) (gsh lexer))
   (begin
     (define parser-state::t
       (make-class-type 'gerbil\x23;parser-state::t 'parser-state (list object::t)

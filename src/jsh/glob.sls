@@ -37,10 +37,7 @@
     (except (jsh pregexp-compat) pregexp-quote pregexp-replace*
       pregexp-replace pregexp-split pregexp-match
       pregexp-match-positions pregexp)
-    (std sugar)
-    (except (jsh util) string-index string-join file-directory?
-      string-join string-index string-downcase file-regular?
-      string-upcase))
+    (std sugar) (gsh util))
   (define glob-pattern?
     (case-lambda
       [(str)

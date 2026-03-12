@@ -16,9 +16,7 @@
    format-time-posix return-status string-join-words
    execute-coproc *next-fake-pid* next-fake-pid!
    launch-background launch-background-simple
-   ast->command-text
-   ;; Profiling
-   *profile-mode* profile-reset! profile-get-data)
+   ast->command-text)
   (import
    (except (chezscheme) box box? unbox set-box! andmap ormap
     iota last-pair find \x31;+ \x31;- fx/ fx1+ fx1- error? raise
@@ -46,54 +44,15 @@
      path-absolute?)
    (except (std format) format) (std sort) (std pregexp)
    (std sugar)
-   ;; Jerboa structured logging for command execution trace
-   (only (std log) make-logger log-info log-debug current-logger)
    (except (jsh pregexp-compat) pregexp-quote pregexp-replace*
      pregexp-replace pregexp-split pregexp-match
      pregexp-match-positions pregexp)
-   (jsh ast) (jsh environment) (jsh expander) (jsh registry)
-   (except (jsh builtins) list-head) (jsh functions)
-   (except (jsh pipeline) void) (jsh redirect) (jsh control)
-   (except (jsh jobs) any every find)
-   (except (jsh util) string-index string-join file-directory?
-     string-join string-index string-downcase file-regular?
-     string-upcase)
-   (jsh arithmetic) (jsh ffi) (jsh glob) (jsh signals))
-  ;; Debug logger: activated by JSH_DEBUG=1/all or component name.
-  ;; Examples: JSH_DEBUG=1 (all), JSH_DEBUG=all, JSH_DEBUG=executor,pipeline
-  (define *jsh-debug-logger*
-    (let ((val (getenv "JSH_DEBUG" #f)))
-      (and val
-           (or (string=? val "1")
-               (string=? val "all")
-               (string-contains? val "executor"))
-           (make-logger 'debug 'component 'executor))))
-  (define (jsh-debug-log msg . args)
-    (when *jsh-debug-logger*
-      (apply log-debug *jsh-debug-logger* msg args)))
-  ;; --- Profiling parameters ---
-  ;; Enable with (*profile-mode* #t), read entries with (profile-get-data).
-  ;; profile-reset! clears accumulated data before a profiling run.
-  (define *profile-mode* (make-parameter #f))
-  (define *profile-depth* (make-parameter 0))  ; internal: inhibit nested recording
-  (define *profile-data* '())                   ; module-level accumulator
-  (define (profile-reset!) (set! *profile-data* '()))
-  (define (profile-get-data) (reverse *profile-data*))
-
+   (gsh ast) (gsh environment) (gsh expander) (gsh registry)
+   (gsh builtins) (gsh functions) (gsh pipeline) (gsh redirect)
+   (gsh control) (gsh jobs) (gsh util) (gsh arithmetic)
+   (gsh ffi) (gsh glob) (gsh signals))
   (define (execute-command cmd env)
     (cond
-      ;; Profile wrapper: record timing at depth 0 when profiling is active.
-      ;; Recursive calls (depth > 0) fall through to normal execution.
-      [(and (*profile-mode*) (= (*profile-depth*) 0))
-       (let* ((text (if cmd
-                      (guard (e (#t "?")) (ast->command-text cmd))
-                      ""))
-              (start   (real-time))
-              (result  (parameterize ((*profile-depth* 1))
-                         (execute-command cmd env)))
-              (elapsed (- (real-time) start)))
-         (set! *profile-data* (cons (list elapsed text result) *profile-data*))
-         result)]
       [(not cmd) 0]
       [(redirected-command? cmd)
        (let ([s (execute-redirected-command cmd env)])
@@ -142,7 +101,7 @@
       [(function-def? cmd) (execute-function-def cmd env)]
       [(time-command? cmd) (execute-time-command cmd env)]
       [else
-       (fprintf (current-error-port) "jsh: unknown command type~n")
+       (fprintf (current-error-port) "gsh: unknown command type~n")
        1]))
   (define (apply-assignment! asgn env)
     (let* ([raw-name (assignment-name asgn)])
@@ -222,7 +181,7 @@
                                               ((lambda (e)
                                                  (fprintf
                                                    (current-error-port)
-                                                   "jsh: ~a~n"
+                                                   "gsh: ~a~n"
                                                    (exception-message e))
                                                  1)
                                                 __exn)])
@@ -279,7 +238,7 @@
                                     (begin
                                       (fprintf
                                         (current-error-port)
-                                        "jsh: : command not found~n")
+                                        "gsh: : command not found~n")
                                       127)
                                     (shell-environment-last-status env))
                                 (begin
@@ -330,7 +289,7 @@
                                                                   [else
                                                                    (fprintf
                                                                      (current-error-port)
-                                                                     "jsh: ~a~n"
+                                                                     "gsh: ~a~n"
                                                                      (exception-message
                                                                        e))
                                                                    1]))
@@ -530,7 +489,7 @@
             (begin
               (fprintf
                 (current-error-port)
-                "jsh: ~a: command not found~n"
+                "gsh: ~a: command not found~n"
                 cmd-name)
               127)
             (guard (__exn
@@ -538,7 +497,7 @@
                       ((lambda (e)
                          (fprintf
                            (current-error-port)
-                           "jsh: ~a: ~a~n"
+                           "gsh: ~a: ~a~n"
                            cmd-name
                            (exception-message e))
                          126)
@@ -582,7 +541,7 @@
                                     (begin
                                       (fprintf
                                         (current-error-port)
-                                        "jsh: ~a: fork failed~n"
+                                        "gsh: ~a: fork failed~n"
                                         cmd-name)
                                       126)
                                     (let-values ([(exit-code stopped?)
@@ -644,7 +603,7 @@
              (begin
                (fprintf
                  (current-error-port)
-                 "jsh: exec: -a: option requires an argument~n")
+                 "gsh: exec: -a: option requires an argument~n")
                1))]
         [(string=? (car args) "-c")
          (parse-flags (cdr args) argv0 #t)]
@@ -661,7 +620,7 @@
                   (begin
                     (fprintf
                       (current-error-port)
-                      "jsh: exec: ~a: not found~n"
+                      "gsh: exec: ~a: not found~n"
                       cmd-name)
                     127)
                   (let* ([exec-path (if (string-contains? path "/")
@@ -690,7 +649,7 @@
                                            packed-env)])
                                 (fprintf
                                   (current-error-port)
-                                  "jsh: exec: ~a: ~a~n"
+                                  "gsh: exec: ~a: ~a~n"
                                   cmd-name
                                   (cond
                                     [(= err 13) "Permission denied"]
@@ -845,7 +804,7 @@
                      [else
                       (fprintf
                         (current-error-port)
-                        "jsh: ~a~n"
+                        "gsh: ~a~n"
                         (exception-message e))
                       1]))
                   __exn)])
@@ -983,7 +942,7 @@
                    ((lambda (e)
                       (fprintf
                         (current-error-port)
-                        "jsh: [[ =~ ]]: invalid regex: ~a~n"
+                        "gsh: [[ =~ ]]: invalid regex: ~a~n"
                         right)
                       #f)
                      __exn)])
@@ -1074,7 +1033,7 @@
                    [else
                     (fprintf
                       (current-error-port)
-                      "jsh: ~a~n"
+                      "gsh: ~a~n"
                       (exception-message e))
                     1]))
                 __exn)])
@@ -1418,7 +1377,7 @@
                                                            (lambda ()
                                                              (fprintf
                                                                (current-error-port)
-                                                               "jsh: ~a: fork failed~n"
+                                                               "gsh: ~a: fork failed~n"
                                                                cmd-name)
                                                              126))])
                                                 (cons

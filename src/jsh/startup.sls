@@ -27,31 +27,27 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar)
-    (except (jsh util) string-index string-join file-directory?
-      string-join string-index string-downcase file-regular?
-      string-upcase)
-    (jsh environment) (jsh script))
+    (std sugar) (gsh util) (gsh environment) (gsh script))
   (define (load-startup-files! env login? interactive?)
     (cond
       [(and login? interactive?)
        (source-if-exists! "/etc/profile" env)
        (let ([home (or (env-get env "HOME") (home-directory))])
          (or (source-if-exists!
-               (string-append home "/.jsh_profile")
+               (string-append home "/.gsh_profile")
                env)
-             (source-if-exists! (string-append home "/.jsh_login") env)
+             (source-if-exists! (string-append home "/.gsh_login") env)
              (source-if-exists! (string-append home "/.profile") env)))]
       [interactive?
        (let ([home (or (env-get env "HOME") (home-directory))])
-         (source-if-exists! (string-append home "/.jshrc") env))]
+         (source-if-exists! (string-append home "/.gshrc") env))]
       [else
        (let ([env-file (env-get env "GSH_ENV")])
          (when env-file (source-if-exists! env-file env)))]))
   (define (run-logout! env)
     (let ([home (or (env-get env "HOME") (home-directory))])
       (source-if-exists!
-        (string-append home "/.jsh_logout")
+        (string-append home "/.gsh_logout")
         env)))
   (define (source-if-exists! path env)
     (if (file-exists? path)

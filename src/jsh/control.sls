@@ -29,8 +29,8 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (jsh ast) (jsh environment) (jsh expander)
-    (jsh glob) (jsh functions))
+    (std sugar) (gsh ast) (gsh environment) (gsh expander)
+    (gsh glob) (gsh functions))
   (define (with-loop-context thunk)
     (parameterize ([*loop-depth* (+ (*loop-depth*) 1)])
       (thunk)))
@@ -55,7 +55,7 @@
           (begin
             (fprintf
               (current-error-port)
-              "jsh: `~a': not a valid identifier~n"
+              "gsh: `~a': not a valid identifier~n"
               var-name)
             2)
           (let* ([word-list (for-command-words cmd)])

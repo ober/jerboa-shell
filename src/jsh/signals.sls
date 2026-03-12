@@ -39,10 +39,7 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (std os signal) (jsh ffi)
-    (except (jsh util) string-index string-join file-directory?
-      string-join string-index string-downcase file-regular?
-      string-upcase))
+    (std sugar) (std os signal) (gsh ffi) (gsh util))
   (begin
     (define trap-entry::t
       (make-class-type 'gerbil\x23;trap-entry::t 'trap-entry (list object::t)

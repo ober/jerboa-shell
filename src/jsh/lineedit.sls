@@ -84,11 +84,7 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar)
-    (except (jsh util) string-index string-join file-directory?
-      string-join string-index string-downcase file-regular?
-      string-upcase)
-    (except (jsh history) string-trim) (jsh ffi))
+    (std sugar) (gsh util) (gsh history) (gsh ffi))
   (define *fzf-history-fn* (make-parameter #f))
   (define *fzf-files-fn* (make-parameter #f))
   (define *fzf-dirs-fn* (make-parameter #f))

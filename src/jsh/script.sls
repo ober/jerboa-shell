@@ -32,14 +32,9 @@
      path-normalize
      path-absolute?)
    (except (std format) format) (std sort) (std pregexp)
-   (std sugar)
-   (except (jsh util) string-index string-join file-directory?
-     string-join string-index string-downcase file-regular?
-     string-upcase)
-   (jsh ast) (jsh environment) (jsh functions) (jsh lexer)
-   (jsh parser) (jsh executor) (jsh signals)
-   (except (jsh jobs) any every find) (jsh static-compat)
-   (jsh registry))
+   (std sugar) (gsh util) (gsh ast) (gsh environment)
+   (gsh functions) (gsh lexer) (gsh parser) (gsh executor)
+   (gsh signals) (gsh jobs) (gsh static-compat) (gsh registry))
   (define *meta-command-handler* (make-parameter #f))
   (define *gerbil-eval-initialized*-cell (vector #f))
   (define-syntax *gerbil-eval-initialized*
@@ -51,7 +46,7 @@
                      v)]))
   (define (ensure-gerbil-eval!)
     "Initialize the Gerbil expander on first use so eval supports full\n   Gerbil syntax (def, defstruct, hash, match, import, etc.).\n   Called lazily to avoid ~100ms startup cost for normal shell operations.\n   Blocked in the 'tiny' tier which has no eval support."
-    (when (string=? (*jsh-tier*) "tiny")
+    (when (string=? (*gsh-tier*) "tiny")
       (error 'gerbil
         "Gerbil eval not available in this build (tier: tiny). Rebuild with GSH_TIER=small or higher"))
     (unless *gerbil-eval-initialized*
@@ -305,7 +300,7 @@
         (begin
           (fprintf
             (current-error-port)
-            "jsh: ~a: No such file or directory~n"
+            "gsh: ~a: No such file or directory~n"
             filename)
           127)
         (guard (__exn
@@ -321,7 +316,7 @@
                        [else
                         (fprintf
                           (current-error-port)
-                          "jsh: ~a: ~a~n"
+                          "gsh: ~a: ~a~n"
                           filename
                           (exception-message e))
                         1]))
@@ -339,7 +334,7 @@
         (begin
           (fprintf
             (current-error-port)
-            "jsh: ~a: No such file or directory~n"
+            "gsh: ~a: No such file or directory~n"
             filename)
           1)
         (guard (__exn
@@ -355,7 +350,7 @@
                        [else
                         (fprintf
                           (current-error-port)
-                          "jsh: ~a: ~a~n"
+                          "gsh: ~a: ~a~n"
                           filename
                           (exception-message e))
                         1]))
@@ -542,7 +537,7 @@
                              ((lambda (e)
                                 (fprintf
                                   (current-error-port)
-                                  "jsh: syntax error: ~a~n"
+                                  "gsh: syntax error: ~a~n"
                                   (exception-message e))
                                 'error)
                                __exn)])
@@ -560,7 +555,7 @@
             [(lexer-want-more? lexer)
              (fprintf
                (current-error-port)
-               "jsh: syntax error: unexpected end of file~n")
+               "gsh: syntax error: unexpected end of file~n")
              (env-set-last-status! env 2)
              2]
             [else
@@ -594,7 +589,7 @@
                                                              __exn)])
                                                    (fprintf
                                                      (current-error-port)
-                                                     "jsh: ~a~n"
+                                                     "gsh: ~a~n"
                                                      msg))
                                                  (if (and (string? msg)
                                                           (or (let ([pfx "parse error"]

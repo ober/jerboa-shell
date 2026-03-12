@@ -64,7 +64,7 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (jsh ast) (jsh environment) (jsh ffi))
+    (std sugar) (gsh ast) (gsh environment) (gsh ffi))
   (begin
     (define shell-function::t
       (make-class-type 'gerbil\x23;shell-function::t 'shell-function

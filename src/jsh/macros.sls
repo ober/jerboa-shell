@@ -31,7 +31,7 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (jsh registry) (for (runtime syntax) expand))
+    (std sugar) (gsh registry) (for (runtime syntax) expand))
   (define-syntax defbuiltin
     (lambda (stx)
       (syntax-case stx ()

@@ -34,11 +34,8 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (jsh ast) (jsh ffi) (jsh environment)
-    (jsh expander)
-    (except (jsh util) string-index string-join file-directory?
-      string-join string-index string-downcase file-regular?
-      string-upcase))
+    (std sugar) (gsh ast) (gsh ffi) (gsh environment)
+    (gsh expander) (gsh util))
   (define O_RDONLY 0)
   (define O_WRONLY 1)
   (define O_RDWR 2)
@@ -114,7 +111,7 @@
                                 (begin
                                   (fprintf
                                     (current-error-port)
-                                    "jsh: ~a: Bad file descriptor~n"
+                                    "gsh: ~a: Bad file descriptor~n"
                                     fd-var)
                                   (error 'gerbil
                                     (string-append
@@ -169,7 +166,7 @@
                                 (file-regular? target-str))
                        (fprintf
                          (current-error-port)
-                         "jsh: ~a: cannot overwrite existing file~n"
+                         "gsh: ~a: cannot overwrite existing file~n"
                          target-str)
                        (restore-single! save)
                        (error 'gerbil "cannot overwrite existing file"))
@@ -416,7 +413,7 @@
                               (begin
                                 (fprintf
                                   (current-error-port)
-                                  "jsh: ~a: bad file descriptor~n"
+                                  "gsh: ~a: bad file descriptor~n"
                                   target-str)
                                 #f))))])]
                   [(<>)
@@ -429,7 +426,7 @@
                          (restore-single! save)
                          (fprintf
                            (current-error-port)
-                           "jsh: ~a: No such file or directory~n"
+                           "gsh: ~a: No such file or directory~n"
                            target-str)
                          (error 'gerbil "cannot open file" target-str))
                        (let ([flags (ffi-fcntl-getfl raw-fd)])
@@ -446,7 +443,7 @@
                   [else
                    (fprintf
                      (current-error-port)
-                     "jsh: unsupported redirect operator ~a~n"
+                     "gsh: unsupported redirect operator ~a~n"
                      op)
                    #f])))))))
   (define (apply-named-fd-redirect! redir env)
@@ -479,7 +476,7 @@
               (when (< raw-fd 0)
                 (fprintf
                   (current-error-port)
-                  "jsh: ~a: No such file or directory~n"
+                  "gsh: ~a: No such file or directory~n"
                   target-str)
                 (error 'gerbil "cannot open file" target-str))
               (let ([high-fd (ffi-dup-above raw-fd 10)])
@@ -500,7 +497,7 @@
                                 (begin
                                   (fprintf
                                     (current-error-port)
-                                    "jsh: ~a: Bad file descriptor~n"
+                                    "gsh: ~a: Bad file descriptor~n"
                                     fd-var)
                                   (error 'gerbil
                                     (string-append
@@ -710,7 +707,7 @@
                                     (dup-gambit-port! target-fd fd)))
                               (fprintf
                                 (current-error-port)
-                                "jsh: ~a: bad file descriptor~n"
+                                "gsh: ~a: bad file descriptor~n"
                                 target-str))))])]
                   [(<>)
                    (let ([raw-fd (ffi-open-raw
@@ -720,7 +717,7 @@
                      (when (< raw-fd 0)
                        (fprintf
                          (current-error-port)
-                         "jsh: ~a: No such file or directory~n"
+                         "gsh: ~a: No such file or directory~n"
                          target-str)
                        (error 'gerbil "cannot open file" target-str))
                      (let ([flags (ffi-fcntl-getfl raw-fd)])
@@ -765,7 +762,7 @@
                   [else
                    (fprintf
                      (current-error-port)
-                     "jsh: unsupported redirect operator ~a~n"
+                     "gsh: unsupported redirect operator ~a~n"
                      op)])))))))
   (define (apply-named-fd-redirect-permanent! redir env)
     (let* ([op (redir-op redir)])
@@ -797,7 +794,7 @@
               (when (< raw-fd 0)
                 (fprintf
                   (current-error-port)
-                  "jsh: ~a: No such file or directory~n"
+                  "gsh: ~a: No such file or directory~n"
                   target-str)
                 (error 'gerbil "cannot open file" target-str))
               (let ([high-fd (ffi-dup-above raw-fd 10)])
@@ -834,7 +831,7 @@
       (when (< raw-fd 0)
         (fprintf
           (current-error-port)
-          "jsh: ~a: No such file or directory~n"
+          "gsh: ~a: No such file or directory~n"
           filename)
         (error 'gerbil "cannot open file" filename))
       (unless (= raw-fd fd)

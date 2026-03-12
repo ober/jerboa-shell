@@ -161,14 +161,14 @@
 
 ;; --- Step 4: Generate C headers with embedded data ---
 (printf "[4/7] Embedding boot files + program as C headers...~n")
-(file->c-header "jsh-all.so" "gsh_program.h"
-                "gsh_program_data" "gsh_program_size")
-(file->c-header (format "~a/petite.boot" chez-dir) "gsh_petite_boot.h"
+(file->c-header "jsh-all.so" "jsh_program.h"
+                "jsh_program_data" "jsh_program_size")
+(file->c-header (format "~a/petite.boot" chez-dir) "jsh_petite_boot.h"
                 "petite_boot_data" "petite_boot_size")
-(file->c-header (format "~a/scheme.boot" chez-dir) "gsh_scheme_boot.h"
+(file->c-header (format "~a/scheme.boot" chez-dir) "jsh_scheme_boot.h"
                 "scheme_boot_data" "scheme_boot_size")
-(file->c-header "jsh.boot" "gsh_gsh_boot.h"
-                "gsh_boot_data" "gsh_boot_size")
+(file->c-header "jsh.boot" "jsh_jsh_boot.h"
+                "jsh_boot_data" "jsh_boot_size")
 
 ;; --- Step 5: Compile C sources ---
 (printf "[5/7] Compiling C sources...~n")
@@ -195,8 +195,8 @@
 (printf "[7/7] Cleaning up...~n")
 (for-each (lambda (f)
             (when (file-exists? f) (delete-file f)))
-  '("jsh-main.o" "ffi-shim.o" "gsh_program.h"
-    "gsh_petite_boot.h" "gsh_scheme_boot.h" "gsh_gsh_boot.h"
+  '("jsh-main.o" "ffi-shim.o" "jsh_program.h"
+    "jsh_petite_boot.h" "jsh_scheme_boot.h" "jsh_jsh_boot.h"
     "jsh-all.so" "jsh.so" "jsh.wpo" "jsh.boot"))
 
 (printf "~n========================================~n")

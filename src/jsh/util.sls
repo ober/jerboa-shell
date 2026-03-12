@@ -46,7 +46,7 @@
     (except (jsh pregexp-compat) pregexp-quote pregexp-replace*
       pregexp-replace pregexp-split pregexp-match
       pregexp-match-positions pregexp)
-    (std sugar) (jsh ffi))
+    (std sugar) (gsh ffi))
   (define (string->c-safe s)
     (let ([len (string-length s)])
       (let check ([i 0])

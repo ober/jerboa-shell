@@ -55,10 +55,7 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (jsh ast)
-    (except (jsh util) string-index string-join file-directory?
-      string-join string-index string-downcase file-regular?
-      string-upcase))
+    (std sugar) (gsh ast) (gsh util))
   (begin
     (define lexer::t
       (make-class-type 'gerbil\x23;lexer::t 'lexer (list object::t)

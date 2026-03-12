@@ -31,11 +31,8 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (jsh ffi)
-    (except (jsh util) string-index string-join file-directory?
-      string-join string-index string-downcase file-regular?
-      string-upcase)
-    (only (jsh expander) find-matching-paren))
+    (std sugar) (gsh ffi) (gsh util)
+    (only (gsh expander) find-matching-paren))
   (define expand-prompt
     (case-lambda
       [(ps-string env-get)
@@ -128,7 +125,7 @@
                     [(#\A) (display (time-string-hhmm) out) (loop (+ i 2))]
                     [(#\n) (display "\n" out) (loop (+ i 2))]
                     [(#\r) (display "\r" out) (loop (+ i 2))]
-                    [(#\s) (display "jsh" out) (loop (+ i 2))]
+                    [(#\s) (display "gsh" out) (loop (+ i 2))]
                     [(#\v) (display "0.1" out) (loop (+ i 2))]
                     [(#\V) (display "0.1.0" out) (loop (+ i 2))]
                     [(#\j)
@@ -255,7 +252,7 @@
                     [(#\A) (display (time-string-hhmm) out) (loop (+ i 2))]
                     [(#\n) (display "\n" out) (loop (+ i 2))]
                     [(#\r) (display "\r" out) (loop (+ i 2))]
-                    [(#\s) (display "jsh" out) (loop (+ i 2))]
+                    [(#\s) (display "gsh" out) (loop (+ i 2))]
                     [(#\v) (display "0.1" out) (loop (+ i 2))]
                     [(#\V) (display "0.1.0" out) (loop (+ i 2))]
                     [(#\j)
@@ -382,7 +379,7 @@
                     [(#\A) (display (time-string-hhmm) out) (loop (+ i 2))]
                     [(#\n) (display "\n" out) (loop (+ i 2))]
                     [(#\r) (display "\r" out) (loop (+ i 2))]
-                    [(#\s) (display "jsh" out) (loop (+ i 2))]
+                    [(#\s) (display "gsh" out) (loop (+ i 2))]
                     [(#\v) (display "0.1" out) (loop (+ i 2))]
                     [(#\V) (display "0.1.0" out) (loop (+ i 2))]
                     [(#\j)
@@ -509,7 +506,7 @@
                     [(#\A) (display (time-string-hhmm) out) (loop (+ i 2))]
                     [(#\n) (display "\n" out) (loop (+ i 2))]
                     [(#\r) (display "\r" out) (loop (+ i 2))]
-                    [(#\s) (display "jsh" out) (loop (+ i 2))]
+                    [(#\s) (display "gsh" out) (loop (+ i 2))]
                     [(#\v) (display "0.1" out) (loop (+ i 2))]
                     [(#\V) (display "0.1.0" out) (loop (+ i 2))]
                     [(#\j)
@@ -634,7 +631,7 @@
                   [(#\A) (display (time-string-hhmm) out) (loop (+ i 2))]
                   [(#\n) (display "\n" out) (loop (+ i 2))]
                   [(#\r) (display "\r" out) (loop (+ i 2))]
-                  [(#\s) (display "jsh" out) (loop (+ i 2))]
+                  [(#\s) (display "gsh" out) (loop (+ i 2))]
                   [(#\v) (display "0.1" out) (loop (+ i 2))]
                   [(#\V) (display "0.1.0" out) (loop (+ i 2))]
                   [(#\j)

@@ -57,14 +57,10 @@
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
     (std sugar)
-    ;; Jerboa transducers for efficient history search pipelines
-    (std transducer)
     (except (jsh pregexp-compat) pregexp-quote pregexp-replace*
       pregexp-replace pregexp-split pregexp-match
       pregexp-match-positions pregexp)
-    (except (jsh util) string-index string-join file-directory?
-      string-join string-index string-downcase file-regular?
-      string-upcase))
+    (gsh util))
   (define (make-history-entry timestamp cwd command)
     (vector timestamp cwd command))
   (define (history-entry-timestamp entry)
@@ -162,13 +158,13 @@
        (let* ([filesize #f])
          (set! *history*
            (make-history-state (make-vector (or histsize 1000) #f) 0 (or histsize 1000)
-             (expand-tilde (or histfile "~/.jsh_history"))
+             (expand-tilde (or histfile "~/.gsh_history"))
              (or filesize (* 2 (or histsize 1000))) (list) (list)))
          (history-load!))]
       [(histfile histsize filesize)
        (set! *history*
          (make-history-state (make-vector (or histsize 1000) #f) 0 (or histsize 1000)
-           (expand-tilde (or histfile "~/.jsh_history"))
+           (expand-tilde (or histfile "~/.gsh_history"))
            (or filesize (* 2 (or histsize 1000))) (list) (list)))
        (history-load!)]))
   (define (history-add! line)
@@ -214,26 +210,18 @@
   (define (history-get-relative offset)
     (let ([entry (history-get-entry-relative offset)])
       (and entry (history-entry-command entry))))
-  ;; history-search: transducer-based prefix search with deduplication.
-  ;; (deduplicate) removes consecutive dups only; use a seen hashtable for
-  ;; full dedup across the entire history list. Composes as a transducer pipeline:
-  ;;   filter by prefix → seen-set dedup → take up to 200
   (define (history-search prefix)
     (if (not *history*)
         (list)
-        (let ([plen (string-length prefix)]
-              [seen (make-hashtable string-hash string=?)])
-          (sequence
-            (compose-transducers
-              (filtering (lambda (cmd)
-                (and (>= (string-length cmd) plen)
-                     (string=? (substring cmd 0 plen) prefix))))
-              (filtering (lambda (cmd)
-                (if (hashtable-ref seen cmd #f)
-                  #f
-                  (begin (hashtable-set! seen cmd #t) #t))))
-              (taking 200))
-            (history-list)))))
+        (let* ([h *history*])
+          (let* ([entries (history-list)])
+            (filter
+              (lambda (cmd)
+                (and (>= (string-length cmd) (string-length prefix))
+                     (string=?
+                       (substring cmd 0 (string-length prefix))
+                       prefix)))
+              entries)))))
   (define (history-search-reverse substr)
     (if (not *history*)
         #f

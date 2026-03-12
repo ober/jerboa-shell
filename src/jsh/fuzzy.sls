@@ -32,10 +32,7 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar)
-    (except (jsh util) string-index string-join file-directory?
-      string-join string-index string-downcase file-regular?
-      string-upcase))
+    (std sugar) (gsh util))
   (define SCORE-MATCH 1)
   (define SCORE-GAP-START -3)
   (define SCORE-GAP-EXTEND -1)
