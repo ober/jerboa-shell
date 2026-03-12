@@ -43,14 +43,13 @@
     ;; stat
     ffi-file-type ffi-file-size ffi-file-mtime ffi-file-mode)
 
-  (import (chezscheme))
+  (import (chezscheme)
+          (only (std foreign) define-foreign ->))
 
   ;; Load FFI symbols.
   ;; 1. dlopen(NULL) — resolves symbols linked into the binary (-rdynamic)
   ;; 2. If ./libgsh-ffi.so exists, load it (interpreted mode via LD_LIBRARY_PATH or cwd)
-  ;; file-exists? is safe during boot init (pure Scheme, no exceptions to catch).
-  ;; load-shared-object "./..." uses dlopen with path, which always works when file exists.
-  (define ffi-lib (load-shared-object ""))
+  (define _ffi-lib (load-shared-object ""))
   (define _ffi-lib-so
     (if (file-exists? "./libgsh-ffi.so")
       (load-shared-object "./libgsh-ffi.so")
@@ -72,8 +71,8 @@
   (define (WSTOPSIG s) (bitwise-arithmetic-shift-right (bitwise-and s #xff00) 8))
 
   ;; --- Waitpid ---
-  (define c-ffi-do-waitpid (foreign-procedure "ffi_do_waitpid" (int int) int))
-  (define c-ffi-get-waitpid-status (foreign-procedure "ffi_get_waitpid_status" () int))
+  (define-foreign c-ffi-do-waitpid "ffi_do_waitpid" (int int) -> int)
+  (define-foreign c-ffi-get-waitpid-status "ffi_get_waitpid_status" () -> int)
 
   (define (ffi-waitpid-pid pid options)
     (c-ffi-do-waitpid pid options))
@@ -82,20 +81,20 @@
     (c-ffi-get-waitpid-status))
 
   ;; --- FD Operations ---
-  (define ffi-dup (foreign-procedure "dup" (int) int))
+  (define-foreign ffi-dup "dup" (int) -> int)
+  (define-foreign ffi-dup2 "dup2" (int int) -> int)
+  (define-foreign ffi-close-fd "close" (int) -> int)
+  (define-foreign ffi-open-raw "open" (string int int) -> int)
+  (define-foreign ffi-mkfifo "mkfifo" (string int) -> int)
+  (define-foreign ffi-unlink "unlink" (string) -> int)
 
   (define (ffi-dup-above fd min-fd)
     ((foreign-procedure "fcntl" (int int int) int) fd 0 min-fd))  ;; F_DUPFD = 0
 
-  (define ffi-dup2 (foreign-procedure "dup2" (int int) int))
-  (define ffi-close-fd (foreign-procedure "close" (int) int))
   ;; No-op stubs: Gambit's select_abort pipe fds don't exist in Chez
   (define (ffi-move-gambit-fds min-fd) 0)
   (define (ffi-gambit-scheduler-rfd) -1)
   (define (ffi-gambit-scheduler-wfd) -1)
-  (define ffi-open-raw (foreign-procedure "open" (string int int) int))
-  (define ffi-mkfifo (foreign-procedure "mkfifo" (string int) int))
-  (define ffi-unlink (foreign-procedure "unlink" (string) int))
 
   ;; F_GETFL = 3, F_SETFL = 4
   (define (ffi-fcntl-getfl fd)
@@ -109,9 +108,9 @@
     ((foreign-procedure "lseek" (int long int) long) fd 0 2))
 
   ;; --- Pipe ---
-  (define c-ffi-do-pipe (foreign-procedure "ffi_do_pipe" () int))
-  (define c-ffi-pipe-read-fd (foreign-procedure "ffi_pipe_read_fd" () int))
-  (define c-ffi-pipe-write-fd (foreign-procedure "ffi_pipe_write_fd" () int))
+  (define-foreign c-ffi-do-pipe "ffi_do_pipe" () -> int)
+  (define-foreign c-ffi-pipe-read-fd "ffi_pipe_read_fd" () -> int)
+  (define-foreign c-ffi-pipe-write-fd "ffi_pipe_write_fd" () -> int)
 
   (define (ffi-pipe-raw)
     (let ((rc (c-ffi-do-pipe)))
@@ -120,14 +119,10 @@
         (error 'ffi-pipe-raw "pipe failed" rc))))
 
   ;; --- Process ---
-  (define ffi-fork (foreign-procedure "fork" () int))
-  (define ffi-exit (foreign-procedure "_exit" (int) void))
-
-  (define ffi-execve
-    (foreign-procedure "ffi_do_execve" (string string string) int))
-
-  (define c-ffi-fork-exec
-    (foreign-procedure "ffi_fork_exec" (string string string int string string) int))
+  (define-foreign ffi-fork "fork" () -> int)
+  (define-foreign ffi-exit "_exit" (int) -> void)
+  (define-foreign ffi-execve "ffi_do_execve" (string string string) -> int)
+  (define-foreign c-ffi-fork-exec "ffi_fork_exec" (string string string int string string) -> int)
 
   (define (ffi-fork-exec path packed-argv packed-env pgid
                           . rest)
@@ -150,42 +145,42 @@
                     [else (values "" "")])])
       (c-ffi-fork-exec path packed-argv packed-env pgid keep-fds cwd)))
 
-  (define ffi-getpid (foreign-procedure "getpid" () int))
-  (define ffi-getppid (foreign-procedure "getppid" () int))
-  (define ffi-setpgid (foreign-procedure "setpgid" (int int) int))
-  (define ffi-getpgid (foreign-procedure "getpgid" (int) int))
-  (define ffi-tcsetpgrp (foreign-procedure "tcsetpgrp" (int int) int))
-  (define ffi-tcgetpgrp (foreign-procedure "tcgetpgrp" (int) int))
-  (define ffi-setsid (foreign-procedure "setsid" () int))
+  (define-foreign ffi-getpid "getpid" () -> int)
+  (define-foreign ffi-getppid "getppid" () -> int)
+  (define-foreign ffi-setpgid "setpgid" (int int) -> int)
+  (define-foreign ffi-getpgid "getpgid" (int) -> int)
+  (define-foreign ffi-tcsetpgrp "tcsetpgrp" (int int) -> int)
+  (define-foreign ffi-tcgetpgrp "tcgetpgrp" (int) -> int)
+  (define-foreign ffi-setsid "setsid" () -> int)
 
   ;; --- User/Perms ---
-  (define ffi-umask (foreign-procedure "umask" (int) int))
-  (define ffi-getuid (foreign-procedure "getuid" () int))
-  (define ffi-geteuid (foreign-procedure "geteuid" () int))
-  (define ffi-getegid (foreign-procedure "getegid" () int))
-  (define ffi-access (foreign-procedure "access" (string int) int))
-  (define ffi-isatty (foreign-procedure "isatty" (int) int))
+  (define-foreign ffi-umask "umask" (int) -> int)
+  (define-foreign ffi-getuid "getuid" () -> int)
+  (define-foreign ffi-geteuid "geteuid" () -> int)
+  (define-foreign ffi-getegid "getegid" () -> int)
+  (define-foreign ffi-access "access" (string int) -> int)
+  (define-foreign ffi-isatty "isatty" (int) -> int)
 
   ;; --- Signal ---
-  (define ffi-signal-was-ignored (foreign-procedure "ffi_signal_was_ignored" (int) int))
-  (define ffi-signal-set-ignore (foreign-procedure "ffi_signal_set_ignore" (int) int))
-  (define ffi-signal-set-default (foreign-procedure "ffi_signal_set_default" (int) int))
-  (define ffi-sigpipe-unblock (foreign-procedure "ffi_sigpipe_unblock" () int))
-  (define ffi-sigpipe-block (foreign-procedure "ffi_sigpipe_block" () int))
-  (define ffi-sigchld-block (foreign-procedure "ffi_sigchld_block" () int))
-  (define ffi-sigchld-unblock (foreign-procedure "ffi_sigchld_unblock" () int))
-  (define ffi-signal-flag-install (foreign-procedure "ffi_signal_flag_install" (int) int))
-  (define ffi-signal-flag-check (foreign-procedure "ffi_signal_flag_check" (int) int))
+  (define-foreign ffi-signal-was-ignored "ffi_signal_was_ignored" (int) -> int)
+  (define-foreign ffi-signal-set-ignore "ffi_signal_set_ignore" (int) -> int)
+  (define-foreign ffi-signal-set-default "ffi_signal_set_default" (int) -> int)
+  (define-foreign ffi-sigpipe-unblock "ffi_sigpipe_unblock" () -> int)
+  (define-foreign ffi-sigpipe-block "ffi_sigpipe_block" () -> int)
+  (define-foreign ffi-sigchld-block "ffi_sigchld_block" () -> int)
+  (define-foreign ffi-sigchld-unblock "ffi_sigchld_unblock" () -> int)
+  (define-foreign ffi-signal-flag-install "ffi_signal_flag_install" (int) -> int)
+  (define-foreign ffi-signal-flag-check "ffi_signal_flag_check" (int) -> int)
 
   ;; --- Environment ---
-  (define ffi-unsetenv (foreign-procedure "unsetenv" (string) int))
+  (define-foreign ffi-unsetenv "unsetenv" (string) -> int)
 
   ;; --- Read ---
-  (define c-ffi-do-read-all (foreign-procedure "ffi_do_read_all" (int) int))
+  (define-foreign c-ffi-do-read-all "ffi_do_read_all" (int) -> int)
   ;; c-ffi-copy-read-buf fills a pre-allocated bytevector with raw bytes from
   ;; the read buffer, avoiding Chez's UTF-8 decoding that replaces invalid
   ;; bytes with U+FFFD. Returns the count actually copied.
-  (define c-ffi-copy-read-buf (foreign-procedure "ffi_copy_read_buf" (u8* int) int))
+  (define-foreign c-ffi-copy-read-buf "ffi_copy_read_buf" (u8* int) -> int)
 
   (define (ffi-read-all-from-fd fd)
     ;; Read all bytes from fd and return a Latin-1 decoded Scheme string.
@@ -202,13 +197,13 @@
             (string-set! result i (integer->char (bytevector-u8-ref bv i)))
             (loop (+ i 1)))))))
 
-  (define ffi-read-byte (foreign-procedure "ffi_read_byte" (int) int))
+  (define-foreign ffi-read-byte "ffi_read_byte" (int) -> int)
 
   (define (ffi-byte-ready? fd)
     (= ((foreign-procedure "ffi_byte_ready" (int) int) fd) 1))
 
-  (define c-ffi-fdread (foreign-procedure "ffi_fdread" (int u8* int) int))
-  (define c-ffi-fdwrite (foreign-procedure "ffi_fdwrite" (int u8* int) int))
+  (define-foreign c-ffi-fdread "ffi_fdread" (int u8* int) -> int)
+  (define-foreign c-ffi-fdwrite "ffi_fdwrite" (int u8* int) -> int)
 
   (define (ffi-fdread fd count)
     (let ((buf (make-bytevector count)))
@@ -224,13 +219,12 @@
     (c-ffi-fdwrite fd bv (bytevector-length bv)))
 
   ;; --- Terminal ---
-  (define ffi-termios-save (foreign-procedure "ffi_termios_save" (int int) int))
-  (define ffi-termios-restore (foreign-procedure "ffi_termios_restore" (int int) int))
-  (define ffi-set-raw-mode (foreign-procedure "ffi_set_raw_mode" (int) int))
-
-  (define c-ffi-get-winsize (foreign-procedure "ffi_get_winsize" (int) int))
-  (define c-ffi-ws-col (foreign-procedure "ffi_ws_col" () int))
-  (define c-ffi-ws-row (foreign-procedure "ffi_ws_row" () int))
+  (define-foreign ffi-termios-save "ffi_termios_save" (int int) -> int)
+  (define-foreign ffi-termios-restore "ffi_termios_restore" (int int) -> int)
+  (define-foreign ffi-set-raw-mode "ffi_set_raw_mode" (int) -> int)
+  (define-foreign c-ffi-get-winsize "ffi_get_winsize" (int) -> int)
+  (define-foreign c-ffi-ws-col "ffi_ws_col" () -> int)
+  (define-foreign c-ffi-ws-row "ffi_ws_row" () -> int)
 
   (define (ffi-terminal-columns fd)
     (if (= (c-ffi-get-winsize fd) 0) (c-ffi-ws-col) 80))
@@ -239,23 +233,23 @@
     (if (= (c-ffi-get-winsize fd) 0) (c-ffi-ws-row) 24))
 
   ;; --- Time ---
-  (define c-ffi-strftime (foreign-procedure "ffi_do_strftime" (string int) string))
+  (define-foreign c-ffi-strftime "ffi_do_strftime" (string int) -> string)
   (define (ffi-strftime fmt epoch)
     (c-ffi-strftime fmt epoch))
 
   ;; --- Resources ---
-  (define ffi-getrlimit-soft (foreign-procedure "ffi_getrlimit_soft" (int) long-long))
-  (define ffi-getrlimit-hard (foreign-procedure "ffi_getrlimit_hard" (int) long-long))
-  (define c-ffi-setrlimit (foreign-procedure "ffi_setrlimit" (int long-long long-long int int) int))
+  (define-foreign ffi-getrlimit-soft "ffi_getrlimit_soft" (int) -> long-long)
+  (define-foreign ffi-getrlimit-hard "ffi_getrlimit_hard" (int) -> long-long)
+  (define-foreign c-ffi-setrlimit "ffi_setrlimit" (int long-long long-long int int) -> int)
 
   (define (ffi-setrlimit resource soft hard only-soft only-hard)
     (c-ffi-setrlimit resource soft hard
       (if only-soft 1 0) (if only-hard 1 0)))
 
   ;; --- Stat ---
-  (define ffi-file-type (foreign-procedure "ffi_file_type" (string int) int))
-  (define ffi-file-size (foreign-procedure "ffi_file_size" (string) long-long))
-  (define ffi-file-mtime (foreign-procedure "ffi_file_mtime" (string) long-long))
-  (define ffi-file-mode (foreign-procedure "ffi_file_mode" (string) int))
+  (define-foreign ffi-file-type "ffi_file_type" (string int) -> int)
+  (define-foreign ffi-file-size "ffi_file_size" (string) -> long-long)
+  (define-foreign ffi-file-mtime "ffi_file_mtime" (string) -> long-long)
+  (define-foreign ffi-file-mode "ffi_file_mode" (string) -> int)
 
   ) ;; end library

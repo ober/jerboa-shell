@@ -206,7 +206,7 @@ JSH_DEBUG=all ./jsh                         # everything
 
 ---
 
-### 2.2 `define-ffi-library` — Replace Manual foreign-procedure Declarations
+### 2.2 `define-ffi-library` — Replace Manual foreign-procedure Declarations [DONE]
 
 **Problem:** `src/jsh/ffi.sls` has 50+ individual `foreign-procedure` calls with hand-written type signatures. Error-prone and verbose.
 
