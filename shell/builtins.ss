@@ -1,4 +1,4 @@
-;;; builtins.ss — Built-in command registry and implementations for gsh
+;;; builtins.ss — Built-in command registry and implementations for jsh
 
 (export #t)
 (import :std/sugar
@@ -8,17 +8,17 @@
         ./pregexp-compat
         :std/os/signal
         :std/os/fdio
-        :gsh/ast
-        :gsh/ffi
-        :gsh/environment
-        :gsh/expander
-        :gsh/functions
-        :gsh/jobs
-        :gsh/signals
-        :gsh/history
-        :gsh/util
-        :gsh/registry
-        :gsh/macros)
+        :jsh/ast
+        :jsh/ffi
+        :jsh/environment
+        :jsh/expander
+        :jsh/functions
+        :jsh/jobs
+        :jsh/signals
+        :jsh/history
+        :jsh/util
+        :jsh/registry
+        :jsh/macros)
 
 ;; Parameter for execute-external — set from executor.ss to break circular dep
 (def *execute-external-fn* (make-parameter #f))
@@ -47,7 +47,7 @@
 
 ;;; --- Built-in implementations ---
 ;;; Each handler: (lambda (args env) -> exit-status)
-;;; Using defbuiltin macro from :gsh/macros for cleaner syntax
+;;; Using defbuiltin macro from :jsh/macros for cleaner syntax
 
 ;; : (colon) — no-op, always succeeds
 (defbuiltin ":" 0)
@@ -363,7 +363,7 @@
                       ;; export -n name=val: not allowed — report error
                       (begin
                         (fprintf (current-error-port)
-                                 "gsh: export: ~a: not a valid identifier~n" arg)
+                                 "jsh: export: ~a: not a valid identifier~n" arg)
                         (set! status 2))
                       (env-export! env name value)))
                   (if remove?
@@ -398,12 +398,12 @@
                  ;; Validate variable name
                  (if (not (valid-name? name))
                    (begin
-                     (fprintf (current-error-port) "gsh: unset: `~a': not a valid identifier~n" name)
+                     (fprintf (current-error-port) "jsh: unset: `~a': not a valid identifier~n" name)
                      (set! status 1))
                    ;; unset -n: unset the nameref itself, not the target
                    (with-catch
                     (lambda (e)
-                      (fprintf (current-error-port) "gsh: unset: ~a: cannot unset~n" name)
+                      (fprintf (current-error-port) "jsh: unset: ~a: cannot unset~n" name)
                       (set! status 1))
                     (lambda () (env-unset-nameref! env name)))))
                 (else
@@ -412,11 +412,11 @@
                         (base-name (if bracket-pos (substring name 0 bracket-pos) name)))
                    (if (not (valid-name? base-name))
                      (begin
-                       (fprintf (current-error-port) "gsh: unset: `~a': not a valid identifier~n" name)
+                       (fprintf (current-error-port) "jsh: unset: `~a': not a valid identifier~n" name)
                        (set! status 1))
                      (with-catch
                       (lambda (e)
-                        (fprintf (current-error-port) "gsh: unset: ~a: cannot unset: readonly variable~n" name)
+                        (fprintf (current-error-port) "jsh: unset: ~a: cannot unset: readonly variable~n" name)
                         (set! status 1))
                       (lambda ()
                         (if (and bracket-pos
@@ -563,7 +563,7 @@
     (if (and (pair? args) (pair? (cdr args)))
       ;; Too many arguments → fatal error
       (begin
-        (fprintf (current-error-port) "gsh: exit: too many arguments~n")
+        (fprintf (current-error-port) "jsh: exit: too many arguments~n")
         (if (*in-subshell*)
           (raise (make-subshell-exit-exception 2))
           (exit 2)))
@@ -572,11 +572,11 @@
                     (let ((n (string->number (car args))))
                       (cond
                         ((not n)
-                         (fprintf (current-error-port) "gsh: exit: ~a: numeric argument required~n" (car args))
+                         (fprintf (current-error-port) "jsh: exit: ~a: numeric argument required~n" (car args))
                          2)
                         ;; Reject values outside 32-bit signed integer range
                         ((or (> n 2147483647) (< n -2147483648))
-                         (fprintf (current-error-port) "gsh: exit: ~a: expected a small integer~n" (car args))
+                         (fprintf (current-error-port) "jsh: exit: ~a: expected a small integer~n" (car args))
                          1)
                         (else (bitwise-and n #xFF))))
                     (shell-environment-last-status env))))
@@ -602,11 +602,11 @@
                       ;; Empty string → 0
                       ((string=? (car args) "") 0)
                       ((not n)
-                       (fprintf (current-error-port) "gsh: return: ~a: numeric argument required~n" (car args))
+                       (fprintf (current-error-port) "jsh: return: ~a: numeric argument required~n" (car args))
                        2)
                       ;; Reject values outside 32-bit signed integer range
                       ((or (> n 2147483647) (< n -2147483648))
-                       (fprintf (current-error-port) "gsh: return: ~a: expected a small integer~n" (car args))
+                       (fprintf (current-error-port) "jsh: return: ~a: expected a small integer~n" (car args))
                        1)
                       (else (bitwise-and n #xFF))))
                   (shell-environment-last-status env))))
@@ -617,7 +617,7 @@
     (cond
       ;; Too many arguments — special builtin error is fatal (bash: exit 1)
       ((> (length args) 1)
-       (fprintf (current-error-port) "gsh: break: too many arguments~n")
+       (fprintf (current-error-port) "jsh: break: too many arguments~n")
        (force-output (current-error-port))
        (if (*in-subshell*)
          (raise (make-subshell-exit-exception 1))
@@ -627,11 +627,11 @@
          (cond
            ((not n)
             ;; Non-numeric arg: print error, set error status, then break (bash compat)
-            (fprintf (current-error-port) "gsh: break: ~a: numeric argument required~n" (car args))
+            (fprintf (current-error-port) "jsh: break: ~a: numeric argument required~n" (car args))
             (env-set-last-status! env 1)
             (shell-break! 1))
            ((<= n 0)
-            (fprintf (current-error-port) "gsh: break: ~a: loop count out of range~n" (car args))
+            (fprintf (current-error-port) "jsh: break: ~a: loop count out of range~n" (car args))
             (env-set-last-status! env 1)
             (shell-break! 1))
            (else (shell-break! n)))))
@@ -642,7 +642,7 @@
     (cond
       ;; Too many arguments — special builtin error is fatal (bash: exit 1)
       ((> (length args) 1)
-       (fprintf (current-error-port) "gsh: continue: too many arguments~n")
+       (fprintf (current-error-port) "jsh: continue: too many arguments~n")
        (force-output (current-error-port))
        (if (*in-subshell*)
          (raise (make-subshell-exit-exception 1))
@@ -652,11 +652,11 @@
          (cond
            ((not n)
             ;; Non-numeric arg: print error, set error status, then continue (bash compat)
-            (fprintf (current-error-port) "gsh: continue: ~a: numeric argument required~n" (car args))
+            (fprintf (current-error-port) "jsh: continue: ~a: numeric argument required~n" (car args))
             (env-set-last-status! env 1)
             (shell-continue! 1))
            ((<= n 0)
-            (fprintf (current-error-port) "gsh: continue: ~a: loop count out of range~n" (car args))
+            (fprintf (current-error-port) "jsh: continue: ~a: loop count out of range~n" (car args))
             (env-set-last-status! env 1)
             (shell-continue! 1))
            (else (shell-continue! n)))))
@@ -778,10 +778,10 @@
       (let ((n (string->number (car args))))
         (cond
           ((not n)
-           (fprintf (current-error-port) "gsh: shift: ~a: numeric argument required~n" (car args))
+           (fprintf (current-error-port) "jsh: shift: ~a: numeric argument required~n" (car args))
            2)
           ((< n 0)
-           (fprintf (current-error-port) "gsh: shift: ~a: shift count out of range~n" (car args))
+           (fprintf (current-error-port) "jsh: shift: ~a: shift count out of range~n" (car args))
            1)
           (else
            (let ((pos (env-positional-list env)))
@@ -810,7 +810,7 @@
               (char=? (string-ref (car args) 0) #\-)
               (not (string=? (car args) "--")))
          (fprintf (current-error-port)
-                  "gsh: eval: ~a: invalid option~n" (car args))
+                  "jsh: eval: ~a: invalid option~n" (car args))
          2)
         (else
          (let ((input (string-join-sp args))
@@ -818,7 +818,7 @@
            (if exec-fn
              (exec-fn input env)
              (begin
-               (fprintf (current-error-port) "gsh: eval: executor not initialized~n")
+               (fprintf (current-error-port) "jsh: eval: executor not initialized~n")
                1)))))))
 
 ;; test / [ — conditional expressions
@@ -907,7 +907,7 @@
              ((function-lookup env name) (displayln name) 0)
              ((alias-get env name) => (lambda (v) (displayln (format "alias ~a='~a'" name v)) 0))
              ((which name) => (lambda (p) (displayln p) 0))
-             (else (fprintf (current-error-port) "gsh: command: ~a: not found~n" name) 1)))
+             (else (fprintf (current-error-port) "jsh: command: ~a: not found~n" name) 1)))
          1))
       ((string=? (car args) "-V")
        ;; Verbose type info
@@ -917,7 +917,7 @@
              ((builtin-lookup name) (displayln (format "~a is a shell builtin" name)) 0)
              ((function-lookup env name) (displayln (format "~a is a function" name)) 0)
              ((which name) => (lambda (p) (displayln (format "~a is ~a" name p)) 0))
-             (else (fprintf (current-error-port) "gsh: command: ~a: not found~n" name) 1)))
+             (else (fprintf (current-error-port) "jsh: command: ~a: not found~n" name) 1)))
          1))
       ;; Strip -p flag (use default PATH) — we don't change PATH behavior
       ((string=? (car args) "-p")
@@ -936,7 +936,7 @@
              (if exec-ext
                (exec-ext cmd-name cmd-args env)
                (begin
-                 (fprintf (current-error-port) "gsh: ~a: command not found~n" cmd-name)
+                 (fprintf (current-error-port) "jsh: ~a: command not found~n" cmd-name)
                  127))))))))
 
 ;; builtin name [args...]
@@ -948,7 +948,7 @@
         (if handler
           (handler (cdr args) env)
           (begin
-            (fprintf (current-error-port) "gsh: builtin: ~a: not a shell builtin~n" (car args))
+            (fprintf (current-error-port) "jsh: builtin: ~a: not a shell builtin~n" (car args))
             1)))))
 
 ;; alias [name[=value] ...]
@@ -1999,17 +1999,17 @@
     (cond
       ;; Too many arguments
       ((and (pair? args) (pair? (cdr args)))
-       (fprintf (current-error-port) "gsh: history: too many arguments~n")
+       (fprintf (current-error-port) "jsh: history: too many arguments~n")
        2)
       ;; Invalid flag (e.g. -5, -c, etc. — anything starting with -)
       ((and (pair? args)
             (> (string-length (car args)) 0)
             (char=? (string-ref (car args) 0) #\-))
-       (fprintf (current-error-port) "gsh: history: ~a: invalid option~n" (car args))
+       (fprintf (current-error-port) "jsh: history: ~a: invalid option~n" (car args))
        2)
       ;; Non-numeric argument
       ((and (pair? args) (not (string->number (car args))))
-       (fprintf (current-error-port) "gsh: history: ~a: numeric argument required~n" (car args))
+       (fprintf (current-error-port) "jsh: history: ~a: numeric argument required~n" (car args))
        2)
       (else
        (let* ((entries (history-list))
@@ -2721,7 +2721,7 @@
 (defbuiltin "help"
     (if (null? args)
       (begin
-        (displayln "gsh - Gerbil Shell")
+        (displayln "jsh - Gerbil Shell")
         (displayln "Built-in commands:")
         (for-each (lambda (name) (display "  ") (displayln name))
                   (builtin-list))
@@ -4112,4 +4112,4 @@
                  (arith-env-setter env)))))
 
 ;; Import arith-eval from arithmetic module
-(import :gsh/arithmetic)
+(import :jsh/arithmetic)

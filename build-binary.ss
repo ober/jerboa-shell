@@ -1,11 +1,11 @@
 #!chezscheme
-;; Build a native gsh binary for jerboa-shell.
+;; Build a native jsh binary for jerboa-shell.
 ;;
 ;; Usage: cd jerboa-shell && make binary
 ;;
-;; Produces: ./gsh (single ELF binary with embedded boot files + program)
+;; Produces: ./jsh (single ELF binary with embedded boot files + program)
 ;;
-;; All boot files (petite.boot, scheme.boot, gsh.boot) are embedded as C byte
+;; All boot files (petite.boot, scheme.boot, jsh.boot) are embedded as C byte
 ;; arrays via Sregister_boot_file_bytes — the binary is fully self-contained
 ;; and works from any directory.
 ;;
@@ -99,11 +99,11 @@
                [debug-level 0]
                [generate-inspector-information #f]
                [generate-wpo-files #t])
-  (compile-program "gsh.ss"))
+  (compile-program "jsh.ss"))
 
 ;; --- Step 2: Whole-program optimization ---
 (printf "[2/7] Running whole-program optimization...~n")
-(let ((missing (compile-whole-program "gsh.wpo" "gsh-all.so")))
+(let ((missing (compile-whole-program "jsh.wpo" "jsh-all.so")))
   (unless (null? missing)
     (printf "  WPO: ~a libraries not incorporated (missing .wpo):~n" (length missing))
     (for-each (lambda (lib) (printf "    ~a~n" lib)) missing)))
@@ -113,7 +113,7 @@
 ;; cannot use fork-thread (Chez Scheme bug — threads block on internal GC futex).
 ;; The program is loaded separately via Sscheme_script at runtime.
 (printf "[3/7] Creating libs-only boot file...~n")
-(apply make-boot-file "gsh.boot" '("scheme" "petite")
+(apply make-boot-file "jsh.boot" '("scheme" "petite")
   (append
     ;; Jerboa runtime + stdlib (dependency order: core first, then modules)
     (map (lambda (m) (format "~a/~a.so" jerboa-dir m))
@@ -150,7 +150,7 @@
     ;; Local compat layer
     (list "src/compat/gambit.so")
     ;; GSH modules (dependency order)
-    (map (lambda (m) (format "src/gsh/~a.so" m))
+    (map (lambda (m) (format "src/jsh/~a.so" m))
       '("ffi" "pregexp-compat" "stage" "static-compat"
         "ast" "registry" "macros" "util"
         "environment" "lexer" "arithmetic" "glob" "fuzzy" "history"
@@ -161,13 +161,13 @@
 
 ;; --- Step 4: Generate C headers with embedded data ---
 (printf "[4/7] Embedding boot files + program as C headers...~n")
-(file->c-header "gsh-all.so" "gsh_program.h"
+(file->c-header "jsh-all.so" "gsh_program.h"
                 "gsh_program_data" "gsh_program_size")
 (file->c-header (format "~a/petite.boot" chez-dir) "gsh_petite_boot.h"
                 "petite_boot_data" "petite_boot_size")
 (file->c-header (format "~a/scheme.boot" chez-dir) "gsh_scheme_boot.h"
                 "scheme_boot_data" "scheme_boot_size")
-(file->c-header "gsh.boot" "gsh_gsh_boot.h"
+(file->c-header "jsh.boot" "gsh_gsh_boot.h"
                 "gsh_boot_data" "gsh_boot_size")
 
 ;; --- Step 5: Compile C sources ---
@@ -177,14 +177,14 @@
   (display "Error: FFI shim compilation failed\n")
   (exit 1))
 ;; Custom main (loads libs from boot, program from embedded memfd)
-(let ((cmd (format "gcc -c -O2 -o gsh-main.o gsh-main.c -I~a -I. -Wall 2>&1" chez-dir)))
+(let ((cmd (format "gcc -c -O2 -o jsh-main.o jsh-main.c -I~a -I. -Wall 2>&1" chez-dir)))
   (unless (= 0 (system cmd))
-    (display "Error: gsh-main.c compilation failed\n")
+    (display "Error: jsh-main.c compilation failed\n")
     (exit 1)))
 
 ;; --- Step 6: Link native binary ---
 (printf "[6/7] Linking native binary...~n")
-(let ((cmd (format "gcc -rdynamic -o gsh gsh-main.o ffi-shim.o -L~a -lkernel -llz4 -lz -lm -ldl -lpthread -luuid -lncurses -Wl,-rpath,~a"
+(let ((cmd (format "gcc -rdynamic -o jsh jsh-main.o ffi-shim.o -L~a -lkernel -llz4 -lz -lm -ldl -lpthread -luuid -lncurses -Wl,-rpath,~a"
              chez-dir chez-dir)))
   (printf "  ~a~n" cmd)
   (unless (= 0 (system cmd))
@@ -195,15 +195,15 @@
 (printf "[7/7] Cleaning up...~n")
 (for-each (lambda (f)
             (when (file-exists? f) (delete-file f)))
-  '("gsh-main.o" "ffi-shim.o" "gsh_program.h"
+  '("jsh-main.o" "ffi-shim.o" "gsh_program.h"
     "gsh_petite_boot.h" "gsh_scheme_boot.h" "gsh_gsh_boot.h"
-    "gsh-all.so" "gsh.so" "gsh.wpo" "gsh.boot"))
+    "jsh-all.so" "jsh.so" "jsh.wpo" "jsh.boot"))
 
 (printf "~n========================================~n")
 (printf "Build complete!~n~n")
-(printf "  Binary: ./gsh  (self-contained ELF, ~a KB)~n"
-  (quotient (file-length (open-file-input-port "gsh")) 1024))
+(printf "  Binary: ./jsh  (self-contained ELF, ~a KB)~n"
+  (quotient (file-length (open-file-input-port "jsh")) 1024))
 (printf "~nRun:~n")
-(printf "  ./gsh              # interactive shell~n")
-(printf "  ./gsh -c 'echo hi' # run command~n")
-(printf "  cp gsh /tmp/ && /tmp/gsh -c 'echo works from anywhere'~n")
+(printf "  ./jsh              # interactive shell~n")
+(printf "  ./jsh -c 'echo hi' # run command~n")
+(printf "  cp jsh /tmp/ && /tmp/jsh -c 'echo works from anywhere'~n")

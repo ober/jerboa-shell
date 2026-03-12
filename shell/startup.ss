@@ -1,12 +1,12 @@
-;;; startup.ss — RC file loading and startup sequences for gsh
+;;; startup.ss — RC file loading and startup sequences for jsh
 ;;; Handles login/interactive/non-interactive startup file sourcing.
 
 (export #t)
 (import :std/sugar
         :std/format
-        :gsh/util
-        :gsh/environment
-        :gsh/script)
+        :jsh/util
+        :jsh/environment
+        :jsh/script)
 
 ;;; --- Public interface ---
 

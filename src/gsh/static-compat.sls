@@ -3,7 +3,7 @@
 ;;; In the Chez port, this is a no-op since we don't have Gambit's
 ;;; static module loader to patch.
 
-(library (gsh static-compat)
+(library (jsh static-compat)
   (export ensure-static-compat! __load-gxi
     scm-only-load-module-active? patch-loader-post-gxi!
     ensure-static-compile-env! static-binary?)

@@ -1,4 +1,4 @@
-;;; signals.ss — Signal handling and traps for gsh
+;;; signals.ss — Signal handling and traps for jsh
 
 (export #t)
 (import :std/sugar
@@ -6,8 +6,8 @@
         :std/sort
         :std/os/signal
         :std/os/signal-handler
-        :gsh/ffi
-        :gsh/util)
+        :jsh/ffi
+        :jsh/util)
 
 ;;; --- Trap table ---
 ;; Maps signal names to actions:

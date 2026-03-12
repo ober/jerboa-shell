@@ -1,4 +1,4 @@
-;;; registry.ss — Built-in command registry for gsh
+;;; registry.ss — Built-in command registry for jsh
 ;;;
 ;;; Separated from builtins.ss to avoid circular dependency with macros.ss
 
@@ -8,7 +8,7 @@
 ;;; --- Build tier ---
 ;; Set by stage.ss at module init time. Controls feature availability.
 ;; Values: "tiny" (shell only), "small" (+eval), "medium" (+compiler), "large" (+coreutils)
-(def *gsh-tier* (make-parameter "tiny"))
+(def *jsh-tier* (make-parameter "tiny"))
 
 ;;; --- Built-in registry ---
 

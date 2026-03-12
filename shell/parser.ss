@@ -1,11 +1,11 @@
-;;; parser.ss — Recursive-descent AST builder for gsh
+;;; parser.ss — Recursive-descent AST builder for jsh
 ;;; Consumes tokens from the lexer and produces AST nodes.
 
 (export #t)
 (import :std/sugar
         :std/format
-        :gsh/ast
-        :gsh/lexer)
+        :jsh/ast
+        :jsh/lexer)
 
 ;;; --- Parser state ---
 

@@ -1,12 +1,12 @@
 /*
- * gsh-main.c — Custom entry point for gsh.
+ * jsh-main.c — Custom entry point for jsh.
  *
  * Chez Scheme's default main() steals flags like -c (interprets as --compact).
  * This custom main bypasses Chez's arg parsing: it saves all user args in
  * positional env vars (GSH_ARGC, GSH_ARG0, GSH_ARG1, ...), then calls the
  * Chez runtime with no user args. The Scheme entry point reads these env vars.
  *
- * Boot files (petite.boot, scheme.boot, gsh.boot) are embedded as C byte
+ * Boot files (petite.boot, scheme.boot, jsh.boot) are embedded as C byte
  * arrays and registered via Sregister_boot_file_bytes — no external files needed.
  *
  * Threading workaround: Programs embedded in boot files (via make-boot-file)
@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* Create memfd for embedded program .so */
-    int fd = memfd_create("gsh-program", MFD_CLOEXEC);
+    int fd = memfd_create("jsh-program", MFD_CLOEXEC);
     if (fd < 0) {
         perror("memfd_create");
         return 1;
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
     /* Register embedded boot files (no external files needed) */
     Sregister_boot_file_bytes("petite", (void*)petite_boot_data, petite_boot_size);
     Sregister_boot_file_bytes("scheme", (void*)scheme_boot_data, scheme_boot_size);
-    Sregister_boot_file_bytes("gsh",    (void*)gsh_boot_data,    gsh_boot_size);
+    Sregister_boot_file_bytes("jsh",    (void*)gsh_boot_data,    gsh_boot_size);
 
     /* Build heap from registered boot files (libraries only — no program) */
     Sbuild_heap(NULL, NULL);

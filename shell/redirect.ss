@@ -1,4 +1,4 @@
-;;; redirect.ss — File descriptor redirection for gsh
+;;; redirect.ss — File descriptor redirection for jsh
 ;;;
 ;;; Key insight: external commands launched via open-process with
 ;;; stdin/stdout/stderr-redirection: #f inherit REAL file descriptors (0,1,2),
@@ -9,11 +9,11 @@
 (export #t)
 (import :std/sugar
         :std/format
-        :gsh/ast
-        :gsh/ffi
-        :gsh/environment
-        :gsh/expander
-        :gsh/util)
+        :jsh/ast
+        :jsh/ffi
+        :jsh/environment
+        :jsh/expander
+        :jsh/util)
 
 ;;; --- O_* flags for ffi-open-raw ---
 (def O_RDONLY   0)
@@ -121,7 +121,7 @@
                     (let ((val (env-get env fd-var)))
                       (or (and val (string->number val))
                           (begin
-                            (fprintf (current-error-port) "gsh: ~a: Bad file descriptor~n" fd-var)
+                            (fprintf (current-error-port) "jsh: ~a: Bad file descriptor~n" fd-var)
                             (error (string-append fd-var ": Bad file descriptor"))))))
                    ;; Explicit numeric fd
                    ((redir-fd redir) => values)
@@ -164,7 +164,7 @@
          ;; Check noclobber — only block regular files (not /dev/null etc.)
          (when (and (env-option? env "noclobber")
                     (file-regular? target-str))
-           (fprintf (current-error-port) "gsh: ~a: cannot overwrite existing file~n" target-str)
+           (fprintf (current-error-port) "jsh: ~a: cannot overwrite existing file~n" target-str)
            (restore-single! save)
            (error "cannot overwrite existing file"))
          (redirect-fd-to-file! fd target-str
@@ -353,7 +353,7 @@
                       (begin (dup-gambit-port! target-fd fd)
                              save))))
                 (begin
-                  (fprintf (current-error-port) "gsh: ~a: bad file descriptor~n" target-str)
+                  (fprintf (current-error-port) "jsh: ~a: bad file descriptor~n" target-str)
                   #f)))))))
       ;; <> file — open read-write on fd
       ;; For FIFOs, use O_NONBLOCK to avoid blocking, then clear it
@@ -363,7 +363,7 @@
          (let ((raw-fd (ffi-open-raw target-str (bitwise-ior O_RDWR O_NONBLOCK) #o666)))
            (when (< raw-fd 0)
              (restore-single! save)
-             (fprintf (current-error-port) "gsh: ~a: No such file or directory~n" target-str)
+             (fprintf (current-error-port) "jsh: ~a: No such file or directory~n" target-str)
              (error "cannot open file" target-str))
            ;; Clear O_NONBLOCK flag after successful open
            (let ((flags (ffi-fcntl-getfl raw-fd)))
@@ -375,7 +375,7 @@
              (ffi-close-fd raw-fd)))
          save))
       (else
-       (fprintf (current-error-port) "gsh: unsupported redirect operator ~a~n" op)
+       (fprintf (current-error-port) "jsh: unsupported redirect operator ~a~n" op)
        #f))))))
 
 ;; Apply named fd redirect: {varname}>file — auto-allocate fd >= 10
@@ -402,7 +402,7 @@
          ;; Open the file to get a raw fd
          (raw-fd (ffi-open-raw target-str flags #o666)))
     (when (< raw-fd 0)
-      (fprintf (current-error-port) "gsh: ~a: No such file or directory~n" target-str)
+      (fprintf (current-error-port) "jsh: ~a: No such file or directory~n" target-str)
       (error "cannot open file" target-str))
     ;; Allocate fd >= 10, skipping any Gambit-internal fds
     ;; ffi-dup-above calls fcntl(F_DUPFD, min) which skips occupied fds
@@ -430,7 +430,7 @@
                     (let ((val (env-get env fd-var)))
                       (or (and val (string->number val))
                           (begin
-                            (fprintf (current-error-port) "gsh: ~a: Bad file descriptor~n" fd-var)
+                            (fprintf (current-error-port) "jsh: ~a: Bad file descriptor~n" fd-var)
                             (error (string-append fd-var ": Bad file descriptor"))))))
                    ((redir-fd redir) => values)
                    (else (default-fd-for-op op))))
@@ -540,14 +540,14 @@
                       (when new-port
                         (set-current-port-for-fd! fd new-port)))
                     (dup-gambit-port! target-fd fd)))
-                (fprintf (current-error-port) "gsh: ~a: bad file descriptor~n" target-str)))))))
+                (fprintf (current-error-port) "jsh: ~a: bad file descriptor~n" target-str)))))))
       ;; <> file — open read-write (permanent)
       ;; For FIFOs, use O_NONBLOCK to avoid blocking, then clear it
       ((<>)
        ;; Open with O_NONBLOCK to prevent blocking on FIFO
        (let ((raw-fd (ffi-open-raw target-str (bitwise-ior O_RDWR O_NONBLOCK) #o666)))
          (when (< raw-fd 0)
-           (fprintf (current-error-port) "gsh: ~a: No such file or directory~n" target-str)
+           (fprintf (current-error-port) "jsh: ~a: No such file or directory~n" target-str)
            (error "cannot open file" target-str))
          ;; Clear O_NONBLOCK flag after successful open
          (let ((flags (ffi-fcntl-getfl raw-fd)))
@@ -585,7 +585,7 @@
          (unless (= read-fd fd)
            (ffi-close-fd read-fd))
          (current-input-port (open-input-string (string-append target-str "\n")))))
-      (else (fprintf (current-error-port) "gsh: unsupported redirect operator ~a~n" op)))))))
+      (else (fprintf (current-error-port) "jsh: unsupported redirect operator ~a~n" op)))))))
 
 ;; Apply named fd redirect permanently: {varname}>file
 (def (apply-named-fd-redirect-permanent! redir env)
@@ -609,7 +609,7 @@
                   (else (bitwise-ior O_WRONLY O_CREAT O_TRUNC))))
          (raw-fd (ffi-open-raw target-str flags #o666)))
     (when (< raw-fd 0)
-      (fprintf (current-error-port) "gsh: ~a: No such file or directory~n" target-str)
+      (fprintf (current-error-port) "jsh: ~a: No such file or directory~n" target-str)
       (error "cannot open file" target-str))
     (let ((high-fd (ffi-dup-above raw-fd 10)))
       (ffi-close-fd raw-fd)
@@ -657,7 +657,7 @@
 (def (redirect-fd-to-file! fd filename flags mode)
   (let ((raw-fd (ffi-open-raw filename flags mode)))
     (when (< raw-fd 0)
-      (fprintf (current-error-port) "gsh: ~a: No such file or directory~n" filename)
+      (fprintf (current-error-port) "jsh: ~a: No such file or directory~n" filename)
       (error "cannot open file" filename))
     (unless (= raw-fd fd)
       (ffi-dup2 raw-fd fd)

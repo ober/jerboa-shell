@@ -2,10 +2,10 @@
 ;;; stage.sls — Build tier configuration for Chez port
 ;;; Tier: small — core shell + Chez eval (no Gerbil compiler/coreutils)
 
-(library (gsh stage)
+(library (jsh stage)
   (export)
-  (import (chezscheme) (gsh registry))
+  (import (chezscheme) (jsh registry))
 
-  (*gsh-tier* "small")
+  (*jsh-tier* "small")
 
   ) ;; end library

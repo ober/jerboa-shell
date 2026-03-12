@@ -162,13 +162,13 @@
        (let* ([filesize #f])
          (set! *history*
            (make-history-state (make-vector (or histsize 1000) #f) 0 (or histsize 1000)
-             (expand-tilde (or histfile "~/.gsh_history"))
+             (expand-tilde (or histfile "~/.jsh_history"))
              (or filesize (* 2 (or histsize 1000))) (list) (list)))
          (history-load!))]
       [(histfile histsize filesize)
        (set! *history*
          (make-history-state (make-vector (or histsize 1000) #f) 0 (or histsize 1000)
-           (expand-tilde (or histfile "~/.gsh_history"))
+           (expand-tilde (or histfile "~/.jsh_history"))
            (or filesize (* 2 (or histsize 1000))) (list) (list)))
        (history-load!)]))
   (define (history-add! line)

@@ -6,11 +6,11 @@
                [optimize-level 3]
                [generate-inspector-information #f])
   (eval '(import
-    (gsh ast) (gsh registry) (gsh macros) (gsh util)
-    (gsh environment) (gsh lexer) (gsh arithmetic) (gsh glob)
-    (gsh fuzzy) (gsh history) (gsh parser) (gsh functions)
-    (gsh signals) (gsh expander) (gsh redirect) (gsh control)
-    (gsh jobs) (gsh builtins) (gsh pipeline) (gsh executor)
-    (gsh completion) (gsh prompt) (gsh lineedit) (gsh fzf)
-    (gsh script) (gsh startup) (gsh main) (gsh stage))
+    (jsh ast) (jsh registry) (jsh macros) (jsh util)
+    (jsh environment) (jsh lexer) (jsh arithmetic) (jsh glob)
+    (jsh fuzzy) (jsh history) (jsh parser) (jsh functions)
+    (jsh signals) (jsh expander) (jsh redirect) (jsh control)
+    (jsh jobs) (jsh builtins) (jsh pipeline) (jsh executor)
+    (jsh completion) (jsh prompt) (jsh lineedit) (jsh fzf)
+    (jsh script) (jsh startup) (jsh main) (jsh stage))
   (interaction-environment)))

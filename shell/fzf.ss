@@ -1,4 +1,4 @@
-;;; fzf.ss — Interactive fuzzy finder TUI for gsh
+;;; fzf.ss — Interactive fuzzy finder TUI for jsh
 ;;;
 ;;; Full-screen terminal UI with live filtering, match highlighting,
 ;;; and scrollable candidate list. Bottom-up layout like fzf.
@@ -19,10 +19,10 @@
         :std/format
         :std/sort
         :std/srfi/1
-        :gsh/util
-        :gsh/fuzzy
-        :gsh/lineedit  ;; for read-key, term-raw!, term-cooked!, *fzf-*-fn* callbacks
-        :gsh/ffi)
+        :jsh/util
+        :jsh/fuzzy
+        :jsh/lineedit  ;; for read-key, term-raw!, term-cooked!, *fzf-*-fn* callbacks
+        :jsh/ffi)
 
 ;;;============================================================================
 ;;; State

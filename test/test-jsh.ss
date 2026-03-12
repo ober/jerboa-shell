@@ -265,9 +265,9 @@
 ;;; ──────────────────────────────────────────────────────────────
 (printf "--- Registry tests ---~n")
 
-(import (only (jsh registry) *gsh-tier*))
+(import (only (jsh registry) *jsh-tier*))
 
-(check-true (string? (*gsh-tier*)))
+(check-true (string? (*jsh-tier*)))
 
 ;;; ─────────────────────────────────────
 ;;; Summary

@@ -1,12 +1,12 @@
-;;; lexer.ss — Shell tokenizer for gsh
+;;; lexer.ss — Shell tokenizer for jsh
 ;;; Handles quoting, operators, heredocs, line continuations,
 ;;; assignment detection, ANSI-C quoting, and comments.
 
 (export #t)
 (import :std/sugar
         :std/format
-        :gsh/ast
-        :gsh/util)
+        :jsh/ast
+        :jsh/util)
 
 ;;; --- Lexer state ---
 

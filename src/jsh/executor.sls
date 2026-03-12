@@ -142,7 +142,7 @@
       [(function-def? cmd) (execute-function-def cmd env)]
       [(time-command? cmd) (execute-time-command cmd env)]
       [else
-       (fprintf (current-error-port) "gsh: unknown command type~n")
+       (fprintf (current-error-port) "jsh: unknown command type~n")
        1]))
   (define (apply-assignment! asgn env)
     (let* ([raw-name (assignment-name asgn)])
@@ -222,7 +222,7 @@
                                               ((lambda (e)
                                                  (fprintf
                                                    (current-error-port)
-                                                   "gsh: ~a~n"
+                                                   "jsh: ~a~n"
                                                    (exception-message e))
                                                  1)
                                                 __exn)])
@@ -279,7 +279,7 @@
                                     (begin
                                       (fprintf
                                         (current-error-port)
-                                        "gsh: : command not found~n")
+                                        "jsh: : command not found~n")
                                       127)
                                     (shell-environment-last-status env))
                                 (begin
@@ -330,7 +330,7 @@
                                                                   [else
                                                                    (fprintf
                                                                      (current-error-port)
-                                                                     "gsh: ~a~n"
+                                                                     "jsh: ~a~n"
                                                                      (exception-message
                                                                        e))
                                                                    1]))
@@ -530,7 +530,7 @@
             (begin
               (fprintf
                 (current-error-port)
-                "gsh: ~a: command not found~n"
+                "jsh: ~a: command not found~n"
                 cmd-name)
               127)
             (guard (__exn
@@ -538,7 +538,7 @@
                       ((lambda (e)
                          (fprintf
                            (current-error-port)
-                           "gsh: ~a: ~a~n"
+                           "jsh: ~a: ~a~n"
                            cmd-name
                            (exception-message e))
                          126)
@@ -582,7 +582,7 @@
                                     (begin
                                       (fprintf
                                         (current-error-port)
-                                        "gsh: ~a: fork failed~n"
+                                        "jsh: ~a: fork failed~n"
                                         cmd-name)
                                       126)
                                     (let-values ([(exit-code stopped?)
@@ -644,7 +644,7 @@
              (begin
                (fprintf
                  (current-error-port)
-                 "gsh: exec: -a: option requires an argument~n")
+                 "jsh: exec: -a: option requires an argument~n")
                1))]
         [(string=? (car args) "-c")
          (parse-flags (cdr args) argv0 #t)]
@@ -661,7 +661,7 @@
                   (begin
                     (fprintf
                       (current-error-port)
-                      "gsh: exec: ~a: not found~n"
+                      "jsh: exec: ~a: not found~n"
                       cmd-name)
                     127)
                   (let* ([exec-path (if (string-contains? path "/")
@@ -690,7 +690,7 @@
                                            packed-env)])
                                 (fprintf
                                   (current-error-port)
-                                  "gsh: exec: ~a: ~a~n"
+                                  "jsh: exec: ~a: ~a~n"
                                   cmd-name
                                   (cond
                                     [(= err 13) "Permission denied"]
@@ -845,7 +845,7 @@
                      [else
                       (fprintf
                         (current-error-port)
-                        "gsh: ~a~n"
+                        "jsh: ~a~n"
                         (exception-message e))
                       1]))
                   __exn)])
@@ -983,7 +983,7 @@
                    ((lambda (e)
                       (fprintf
                         (current-error-port)
-                        "gsh: [[ =~ ]]: invalid regex: ~a~n"
+                        "jsh: [[ =~ ]]: invalid regex: ~a~n"
                         right)
                       #f)
                      __exn)])
@@ -1074,7 +1074,7 @@
                    [else
                     (fprintf
                       (current-error-port)
-                      "gsh: ~a~n"
+                      "jsh: ~a~n"
                       (exception-message e))
                     1]))
                 __exn)])
@@ -1418,7 +1418,7 @@
                                                            (lambda ()
                                                              (fprintf
                                                                (current-error-port)
-                                                               "gsh: ~a: fork failed~n"
+                                                               "jsh: ~a: fork failed~n"
                                                                cmd-name)
                                                              126))])
                                                 (cons

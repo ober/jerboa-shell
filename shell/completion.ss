@@ -1,4 +1,4 @@
-;;; completion.ss — Tab completion engine for gsh
+;;; completion.ss — Tab completion engine for jsh
 ;;; Provides default and programmable completion.
 
 (export #t)
@@ -6,12 +6,12 @@
         :std/format
         :std/iter
         :std/sort
-        :gsh/util
-        :gsh/environment
-        :gsh/registry
-        :gsh/builtins
-        :gsh/functions
-        :gsh/glob)
+        :jsh/util
+        :jsh/environment
+        :jsh/registry
+        :jsh/builtins
+        :jsh/functions
+        :jsh/glob)
 
 ;;; --- Completion registry (programmable completion) ---
 

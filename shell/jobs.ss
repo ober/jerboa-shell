@@ -1,14 +1,14 @@
-;;; jobs.ss — Job control for gsh
+;;; jobs.ss — Job control for jsh
 
 (export #t)
 (import :std/sugar
         :std/format
         :std/iter
         :std/os/signal
-        :gsh/ffi
-        :gsh/util
-        :gsh/signals
-        :gsh/environment)
+        :jsh/ffi
+        :jsh/util
+        :jsh/signals
+        :jsh/environment)
 
 ;;; --- Job structures ---
 

@@ -1,4 +1,4 @@
-;;; ffi.ss — POSIX FFI bindings for gsh
+;;; ffi.ss — POSIX FFI bindings for jsh
 ;;; Provides: waitpid, dup2, setpgid, tcsetpgrp, umask, etc.
 ;;; All functions are standard POSIX libc — no external libraries needed.
 

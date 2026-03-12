@@ -1,43 +1,43 @@
-;;; lib.ss — Library API for embedding gsh in Gerbil projects
+;;; lib.ss — Library API for embedding jsh in Gerbil projects
 ;;;
 ;;; Quick start:
-;;;   (import :gsh/lib)
-;;;   (def env (gsh-init!))
-;;;   (gsh-run "echo hello" env)           ;; prints "hello", returns 0
-;;;   (gsh-capture "echo hello" env)       ;; returns (values "hello\n" 0)
+;;;   (import :jsh/lib)
+;;;   (def env (jsh-init!))
+;;;   (jsh-run "echo hello" env)           ;; prints "hello", returns 0
+;;;   (jsh-capture "echo hello" env)       ;; returns (values "hello\n" 0)
 ;;;
 ;;; For advanced use, import individual modules directly:
-;;;   (import :gsh/parser :gsh/executor :gsh/environment)
+;;;   (import :jsh/parser :jsh/executor :jsh/environment)
 
-(export gsh-init!
-        gsh-run
-        gsh-capture
-        gsh-execute-input
-        gsh-process-traps!)
+(export jsh-init!
+        jsh-run
+        jsh-capture
+        jsh-execute-input
+        jsh-process-traps!)
 
 (import :std/sugar
         :std/format
-        :gsh/util
-        :gsh/ast
-        :gsh/environment
-        :gsh/lexer
-        :gsh/parser
-        :gsh/executor
-        :gsh/expander
-        :gsh/functions
-        :gsh/registry
-        :gsh/builtins
-        :gsh/signals
-        :gsh/jobs
-        :gsh/script
-        :gsh/arithmetic
-        :gsh/ffi)
+        :jsh/util
+        :jsh/ast
+        :jsh/environment
+        :jsh/lexer
+        :jsh/parser
+        :jsh/executor
+        :jsh/expander
+        :jsh/functions
+        :jsh/registry
+        :jsh/builtins
+        :jsh/signals
+        :jsh/jobs
+        :jsh/script
+        :jsh/arithmetic
+        :jsh/ffi)
 
 ;;; --- Initialization ---
 
-(def (gsh-init! (interactive? #f) (manage-fds? #f) (manage-signals? #f))
-  "Initialize the gsh shell engine and return a shell environment.
-   Must be called before using any gsh functions.
+(def (jsh-init! (interactive? #f) (manage-fds? #f) (manage-signals? #f))
+  "Initialize the jsh shell engine and return a shell environment.
+   Must be called before using any jsh functions.
 
    Options:
      interactive?    — #t for job control and terminal handling (default #f)
@@ -58,10 +58,10 @@
     (env-init! env)
     (env-set! env "GSH_VERSION" "0.1.0")
     ;; Wire up circular dependency parameters
-    (*execute-input* (lambda (input env) (gsh-execute-input input env)))
+    (*execute-input* (lambda (input env) (jsh-execute-input input env)))
     (*arith-eval-fn* arith-eval)
     (*execute-external-fn* execute-external)
-    (*process-traps-fn* (lambda (env) (gsh-process-traps! env)))
+    (*process-traps-fn* (lambda (env) (jsh-process-traps! env)))
     ;; Register source/. builtins (normally done in main.ss)
     (register-source-builtins! env)
     ;; Optionally set up signal handlers
@@ -76,7 +76,7 @@
 
 ;;; --- Core execution ---
 
-(def (gsh-execute-input input env)
+(def (jsh-execute-input input env)
   "Parse and execute a shell command string. Returns exit status."
   (with-catch
    (lambda (e)
@@ -89,7 +89,7 @@
        ((return-exception? e) (raise e))
        (else
         (let ((msg (exception-message e)))
-          (fprintf (current-error-port) "gsh: ~a~n" msg)
+          (fprintf (current-error-port) "jsh: ~a~n" msg)
           (if (and (string? msg)
                    (or (string-prefix? "parse error" msg)
                        (string-prefix? "bad substitution: unclosed" msg)))
@@ -97,7 +97,7 @@
    (lambda ()
      (let ((cmd (with-catch
                  (lambda (e)
-                   (fprintf (current-error-port) "gsh: syntax error: ~a~n"
+                   (fprintf (current-error-port) "jsh: syntax error: ~a~n"
                             (exception-message e))
                    'error)
                  (lambda ()
@@ -111,7 +111,7 @@
 
 ;;; --- Trap processing ---
 
-(def (gsh-process-traps! env)
+(def (jsh-process-traps! env)
   "Process pending signals and execute trap commands."
   (let ((signals (pending-signals!)))
     (for-each
@@ -124,20 +124,20 @@
        (let ((action (trap-get sig-name)))
          (when (and action (string? action))
            (let ((saved-status (shell-environment-last-status env)))
-             (gsh-execute-input action env)
+             (jsh-execute-input action env)
              (env-set-last-status! env saved-status)))))
      signals)))
 
 ;;; --- Convenience API ---
 
-(def (gsh-run input env)
+(def (jsh-run input env)
   "Execute a shell command string (may span multiple lines).
    Returns exit status (integer)."
   (let ((status (execute-string input env)))
     (env-set-last-status! env status)
     status))
 
-(def (gsh-capture input env)
+(def (jsh-capture input env)
   "Execute a shell command and capture stdout.
    Returns (values output-string exit-status)."
   (let ((output (command-substitute input env)))
@@ -153,7 +153,7 @@
                          args)))
              (if (null? args)
                (begin
-                 (fprintf (current-error-port) "gsh: source: filename argument required~n")
+                 (fprintf (current-error-port) "jsh: source: filename argument required~n")
                  2)
                (let* ((filename (car args))
                       (filepath (if (string-contains? filename "/")

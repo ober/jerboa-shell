@@ -104,7 +104,7 @@
                                   (begin
                                     (fprintf
                                       (current-error-port)
-                                      "gsh: source: filename argument required~n")
+                                      "jsh: source: filename argument required~n")
                                     2)
                                   (let* ([filename (car args)])
                                     (let* ([filepath (if (string-contains?
@@ -153,7 +153,7 @@
           (env-set!
             env
             "HISTFILE"
-            (string-append home "/.gsh_history"))))
+            (string-append home "/.jsh_history"))))
       (unless (env-get env "HISTSIZE")
         (env-set! env "HISTSIZE" "1000"))
       (when (hash-ref args-hash 'verbose?)
@@ -164,7 +164,7 @@
       env))
   (define (repl env)
     (let ([histfile (or (env-get env "HISTFILE")
-                        "~/.gsh_history")]
+                        "~/.jsh_history")]
           [histsize (or (string->number
                           (or (env-get env "HISTSIZE") "1000"))
                         1000)])
@@ -229,7 +229,7 @@
                                            ((lambda (e)
                                               (fprintf
                                                 (current-error-port)
-                                                "gsh: ~a~n"
+                                                "jsh: ~a~n"
                                                 (exception-message e))
                                               #f)
                                              __exn)])
@@ -292,7 +292,7 @@
                        [(return-exception? e) (raise e)]
                        [else
                         (let ([msg (exception-message e)])
-                          (fprintf (current-error-port) "gsh: ~a~n" msg)
+                          (fprintf (current-error-port) "jsh: ~a~n" msg)
                           (if (and (string? msg)
                                    (or (let ([pfx "parse error"] [str msg])
                                          (let ([plen (string-length pfx)])
@@ -323,7 +323,7 @@
                                ((lambda (e)
                                   (fprintf
                                     (current-error-port)
-                                    "gsh: syntax error: ~a~n"
+                                    "jsh: syntax error: ~a~n"
                                     (exception-message e))
                                   'error)
                                  __exn)])
@@ -430,7 +430,7 @@
                                                                  e)])
                                                       (fprintf
                                                         (current-error-port)
-                                                        "gsh: ~a~n"
+                                                        "jsh: ~a~n"
                                                         msg)
                                                       (if (and (string?
                                                                  msg)

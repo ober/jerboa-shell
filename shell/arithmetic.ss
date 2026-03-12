@@ -1,4 +1,4 @@
-;;; arithmetic.ss — Shell arithmetic evaluation for gsh
+;;; arithmetic.ss — Shell arithmetic evaluation for jsh
 ;;; Implements $(( )) arithmetic with full operator precedence
 
 (export arith-eval arith-tokenize arith-token? arith-token-type arith-token-value

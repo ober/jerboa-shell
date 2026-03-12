@@ -1,4 +1,4 @@
-;;; ast.ss — AST node definitions for gsh
+;;; ast.ss — AST node definitions for jsh
 
 (export #t)
 

@@ -6,6 +6,6 @@
   (export)
   (import (chezscheme) (jsh registry))
 
-  (*gsh-tier* "small")
+  (*jsh-tier* "small")
 
   ) ;; end library

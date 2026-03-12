@@ -1,4 +1,4 @@
-;;; util.ss — Shared utilities for gsh
+;;; util.ss — Shared utilities for jsh
 
 (export #t)
 (import :std/misc/string
@@ -9,7 +9,7 @@
         :std/sugar
         :std/iter
         :std/error
-        :gsh/ffi)
+        :jsh/ffi)
 
 ;;; --- open-process string encoding ---
 

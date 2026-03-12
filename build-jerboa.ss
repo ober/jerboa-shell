@@ -17,7 +17,7 @@
 
 ;; --- Configuration ---
 (define submodule-dir "gerbil-shell")
-(define output-dir "src/gsh")
+(define output-dir "src/jsh")
 
 ;; Find source file: check local override first, then submodule
 (define (find-source name)
@@ -30,7 +30,7 @@
 
 ;; --- Import map: Gerbil module → Jerboa library ---
 ;; KEY DIFFERENCE from gherkin-shell: maps to (std ...) / (jerboa ...) paths
-(define gsh-import-map
+(define jsh-import-map
   '(;; Standard library → Jerboa stdlib
     (:std/sugar        . (std sugar))
     (:std/format       . (std format))
@@ -56,13 +56,13 @@
     (:gerbil/expander   . #f)
     (:gerbil/compiler   . #f)
     ;; Relative imports
-    ("./pregexp-compat" . (gsh pregexp-compat))
+    ("./pregexp-compat" . (jsh pregexp-compat))
     ))
 
 ;; --- Base imports for all compiled modules ---
 ;; KEY DIFFERENCE: uses (jerboa runtime) instead of (runtime util/table/mop/hash)
 ;; and (compat gambit) from local src/compat/ instead of gherkin's
-(define gsh-base-imports
+(define jsh-base-imports
   '((except (chezscheme) box box? unbox set-box!
             andmap ormap iota last-pair find
             1+ 1- fx/ fx1+ fx1-
@@ -242,7 +242,7 @@
 (define (lib-name->sls-path lib-name)
   (cond
     ((and (pair? lib-name) (= (length lib-name) 2)
-          (eq? (car lib-name) 'gsh))
+          (eq? (car lib-name) 'jsh))
      (string-append output-dir "/" (symbol->string (cadr lib-name)) ".sls"))
     ((and (pair? lib-name) (= (length lib-name) 2)
           (eq? (car lib-name) 'compat))
@@ -289,7 +289,7 @@
 (define (compile-module name)
   (let* ((input-path (find-source name))
          (output-path (string-append output-dir "/" name ".sls"))
-         (lib-name `(gsh ,(string->symbol name))))
+         (lib-name `(jsh ,(string->symbol name))))
     (display (string-append "  Compiling: " name ".ss → " name ".sls\n"))
     (guard (exn
              (#t (display (string-append "  ERROR: " name ".ss failed: "))
@@ -301,7 +301,7 @@
                  #f))
       (let* ((lib-form (gerbil-compile-to-library
                          input-path lib-name
-                         gsh-import-map gsh-base-imports))
+                         jsh-import-map jsh-base-imports))
              (lib-form (fix-import-conflicts lib-form)))
         (call-with-output-file output-path
           (lambda (port)
@@ -315,7 +315,7 @@
 ;; --- Main ---
 (display "=== Jerboa Shell Builder ===\n\n")
 
-;; Tier 1: No dependencies on other gsh modules
+;; Tier 1: No dependencies on other jsh modules
 (display "--- Tier 1: Foundation ---\n")
 (compile-module "ast")
 (compile-module "registry")
@@ -374,7 +374,7 @@
           ((> (+ i nlen) hlen) #f)
           ((string=? (substring haystack i (+ i nlen)) needle) i)
           (else (loop (+ i 1)))))))
-  (let* ((path "src/gsh/main.sls")
+  (let* ((path "src/jsh/main.sls")
          (content (call-with-input-file path
                     (lambda (p) (get-string-all p)))))
     (let ((needle (string #\newline #\space #\space #\( #\d #\e #\f #\i #\n #\e #\space)))
@@ -384,7 +384,7 @@
             (call-with-output-file path
               (lambda (p)
                 (display (substring content 0 idx) p)
-                (display "\n  ;; Force invocation of (gsh builtins) for defbuiltin registration\n" p)
+                (display "\n  ;; Force invocation of (jsh builtins) for defbuiltin registration\n" p)
                 (display "  (define _force-builtins special-builtin?)" p)
                 (display (substring content idx (string-length content)) p))
               'replace)
@@ -422,33 +422,33 @@
           #f))))
 
   ;; Fix env-push-scope: keyword-style args → positional
-  (patch-file! "src/gsh/environment.sls"
+  (patch-file! "src/jsh/environment.sls"
     "(define (env-push-scope env)\n    (make-shell-environment\n      'parent:\n      env\n      'name:\n      (shell-environment-shell-name env)))"
     "(define (env-push-scope env)\n    (make-shell-environment env (shell-environment-shell-name env)))")
 
   ;; Fix env-clone: no-arg constructor + manual set
-  (patch-file! "src/gsh/environment.sls"
+  (patch-file! "src/jsh/environment.sls"
     "(define (env-clone env)\n    (let ([clone (make-shell-environment\n                   'name:\n                   (shell-environment-shell-name env))])"
     "(define (env-clone env)\n    (let ([clone (let ([e (make-shell-environment)])\n                   (shell-environment-shell-name-set! e (shell-environment-shell-name env))\n                   e)])")
 
   ;; Fix exception-message: Chez condition-message returns raw format templates
-  (patch-file! "src/gsh/util.sls"
+  (patch-file! "src/jsh/util.sls"
     "(define (exception-message e)\n    (cond\n      [(Error? e) (Error-message e)]\n      [(error-exception? e) (error-exception-message e)]\n      [(string? e) e]\n      [(os-exception? e)\n       (call-with-output-string\n         (lambda (p) (display-exception e p)))]\n      [else\n       (call-with-output-string\n         (lambda (p) (display-exception e p)))]))"
     "(define (exception-message e)\n    (define (format-condition e)\n      (let ([msg (call-with-string-output-port\n                   (lambda (p) (display-condition e p)))])\n        (if (and (> (string-length msg) 11)\n                 (string=? (substring msg 0 11) \"Exception: \"))\n            (substring msg 11 (string-length msg))\n            (if (and (> (string-length msg) 13)\n                     (string=? (substring msg 0 13) \"Exception in \"))\n                (let loop ([i 13])\n                  (cond\n                    [(>= (+ i 1) (string-length msg)) msg]\n                    [(and (char=? (string-ref msg i) #\\:)\n                          (char=? (string-ref msg (+ i 1)) #\\space))\n                     (substring msg (+ i 2) (string-length msg))]\n                    [else (loop (+ i 1))]))\n                msg))))\n    (cond\n      [(string? e) e]\n      [(condition? e) (format-condition e)]\n      [else (call-with-string-output-port\n              (lambda (p) (display e p)))]))")
 
   ;; Fix make-mutex: Chez requires symbol or #f, not strings
-  (patch-file! "src/gsh/pipeline.sls"
+  (patch-file! "src/jsh/pipeline.sls"
     "(make-mutex \"pipeline-fd\")"
     "(make-mutex 'pipeline-fd)")
 
   ;; --- Performance optimizations ---
 
   ;; Add PATH lookup cache to util.sls (which-cached)
-  (patch-file! "src/gsh/util.sls"
+  (patch-file! "src/jsh/util.sls"
     "string-last-index-of which find-file-in-path executable?"
     "string-last-index-of which which-cached which-cache-invalidate!\n   find-file-in-path executable?")
 
-  (patch-file! "src/gsh/util.sls"
+  (patch-file! "src/jsh/util.sls"
     "(define find-file-in-path"
     (string-append
       ";; PATH lookup cache — equivalent to bash's command_hash\n"
@@ -473,7 +473,7 @@
 
   ;; Replace (which cmd-name) with (which-cached cmd-name) in executor.sls
   ;; Use a helper to replace all occurrences
-  (let ((path "src/gsh/executor.sls"))
+  (let ((path "src/jsh/executor.sls"))
     (let* ((content (call-with-input-file path
                       (lambda (p) (get-string-all p))))
            (old "(which cmd-name)")
@@ -494,7 +494,7 @@
            (loop (+ i 1) (string-append result (substring content i (+ i 1)))))))))
 
   ;; env-get single-pass: eliminate double hash-table scan in env-get
-  (patch-file! "src/gsh/environment.sls"
+  (patch-file! "src/jsh/environment.sls"
     (string-append
       "      [else\n"
       "       (let ([resolved (resolve-nameref name env)])\n"

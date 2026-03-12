@@ -10,7 +10,7 @@
         (only (reader reader) gerbil-read))
 
 ;; Set tier and force builtin registration
-(*gsh-tier* "small")
+(*jsh-tier* "small")
 ;; Touch a builtins export to force Chez to invoke (jsh builtins),
 ;; which runs the defbuiltin registration side effects.
 (let () special-builtin? (void))
@@ -518,7 +518,7 @@
                     (gerbil-eval-forms gerbil-forms))))
            (cons (format-result result) 0))]))))
 
-;; Get args from JSH_ARGC/JSH_ARGn env vars (set by gsh-main.c)
+;; Get args from JSH_ARGC/JSH_ARGn env vars (set by jsh-main.c)
 ;; or fall back to (command-line) for interpreted mode.
 (define (get-real-args)
   (let ((argc-str (getenv "JSH_ARGC")))

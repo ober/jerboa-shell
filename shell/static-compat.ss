@@ -1,5 +1,5 @@
-;;; static-compat.ss -- Static binary compatibility for gsh
-;;; Patches the Gerbil module loader to try .o1 first (via gsh-dlopen),
+;;; static-compat.ss -- Static binary compatibility for jsh
+;;; Patches the Gerbil module loader to try .o1 first (via jsh-dlopen),
 ;;; falling back to .scm files for builtin modules without separate .o1.
 ;;;
 ;;; Both script.ss (,eval) and compiler.ss (,use) need this patching.
@@ -19,7 +19,7 @@
         static-binary?)
 
 (import :gerbil/runtime/loader
-        :gsh/ffi)
+        :jsh/ffi)
 
 ;;; --- State ---
 
@@ -47,13 +47,13 @@
    The .ssi files are needed by the expander's import-module to resolve
    module metadata. The .scm files contain runtime module code that
    load-module needs (numbered sub-modules like expander~1, ~2, etc.).
-   Uses ~/.cache/gsh/lib/ as the cache directory with sentinel files
+   Uses ~/.cache/jsh/lib/ as the cache directory with sentinel files
    to avoid re-extracting on subsequent runs."
   (let* ((cache-base (or (getenv "XDG_CACHE_HOME" #f)
                          (let ((home (getenv "HOME" #f)))
                            (and home (string-append home "/.cache")))))
          (cache-dir (and cache-base
-                         (string-append cache-base "/gsh/lib"))))
+                         (string-append cache-base "/jsh/lib"))))
     (when cache-dir
       ;; Extract .ssi files
       (when (> (ffi-has-embedded-ssi) 0)
@@ -192,7 +192,7 @@
 
 (def (make-native-first-load-module)
   "Build a replacement load-module that tries .o1 first (via Gambit's
-   native load which uses our gsh-dlopen), falling back to .scm.
+   native load which uses our jsh-dlopen), falling back to .scm.
    Replicates the caching/mutex logic from gerbil/runtime/loader."
   (lambda (modpath)
     (mutex-lock! __load-mx)
@@ -211,7 +211,7 @@
         ;; Mark as loading and release mutex before I/O
         (hash-put! __modules modpath 'loading)
         (mutex-unlock! __load-mx)
-        ;; Try .o1 first via Gambit's native load (→ dlopen via gsh-dlopen)
+        ;; Try .o1 first via Gambit's native load (→ dlopen via jsh-dlopen)
         (let ((o1-path (with-catch (lambda (e) #f)
                          (lambda () (find-compiled-o1 modpath)))))
            (if o1-path
@@ -279,7 +279,7 @@
 
 (def (patch-loader-scm-only!)
   "Override load-module to try .o1 first (via Gambit's native load +
-   gsh-dlopen), then fall back to .scm for modules without .o1 files.
+   jsh-dlopen), then fall back to .scm for modules without .o1 files.
    Patches Gambit's global variable table so .ssi files see the patched version.
    Patches both 'load-module and '__load-module (the compiled Gerbil name).
    Also stores the replacement in a Gambit global for post-__load-gxi patching."
@@ -316,7 +316,7 @@
 (def (ensure-static-compat!)
   "If running as a static binary, patch the module loader before __load-gxi.
    Extracts embedded .ssi and .scm files, patches load-module to try .o1
-   first (via gsh-dlopen) then fall back to .scm, then pre-loads sub-module
+   first (via jsh-dlopen) then fall back to .scm, then pre-loads sub-module
    .scm files so the expander has all bindings ready.
    Order matters: extract -> patch -> pre-load.
    Idempotent -- only patches once."
@@ -333,9 +333,9 @@
 
 (def (ensure-static-compile-env!)
   "Set up the compile-file environment for the static binary.
-   Extracts embedded gambit.h to ~/.cache/gsh/include/,
-   generates a minimal gambuild-C script at ~/.cache/gsh/bin/,
-   and sets ~~ to ~/.cache/gsh/ so compile-file can find them.
+   Extracts embedded gambit.h to ~/.cache/jsh/include/,
+   generates a minimal gambuild-C script at ~/.cache/jsh/bin/,
+   and sets ~~ to ~/.cache/jsh/ so compile-file can find them.
    Returns #t if environment was set up successfully, #f otherwise.
    Idempotent."
   (cond
@@ -346,7 +346,7 @@
     (let* ((cache-base (or (getenv "XDG_CACHE_HOME" #f)
                            (let ((home (getenv "HOME" #f)))
                              (and home (string-append home "/.cache")))))
-           (gambit-home (and cache-base (string-append cache-base "/gsh")))
+           (gambit-home (and cache-base (string-append cache-base "/jsh")))
            (include-dir (and gambit-home (string-append gambit-home "/include")))
            (bin-dir (and gambit-home (string-append gambit-home "/bin")))
            (lib-dir (and gambit-home (string-append gambit-home "/lib"))))
@@ -377,7 +377,7 @@
 
 (def gambuild-c-script
   "#!/bin/sh
-# Minimal gambuild-C for gsh static binary
+# Minimal gambuild-C for jsh static binary
 # Only handles dyn operation (compile .c -> .o1)
 case \"$1\" in
   dyn)

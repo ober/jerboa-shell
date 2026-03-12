@@ -1,12 +1,12 @@
-;;; functions.ss — Shell functions and aliases for gsh
+;;; functions.ss — Shell functions and aliases for jsh
 
 (export #t)
 (import :std/sugar
         :std/format
         :std/iter
-        :gsh/ast
-        :gsh/environment
-        :gsh/ffi)
+        :jsh/ast
+        :jsh/environment
+        :jsh/ffi)
 
 ;;; --- Shell functions ---
 

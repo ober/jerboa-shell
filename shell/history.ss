@@ -1,4 +1,4 @@
-;;; history.ss — Command history for gsh
+;;; history.ss — Command history for jsh
 ;;;
 ;;; Entries stored as 3-element vectors: #(timestamp cwd command)
 ;;; File format: EPOCH\tCWD\tCOMMAND  (tab-separated, one per line)
@@ -8,7 +8,7 @@
 (import :std/sugar
         :std/format
         ./pregexp-compat
-        :gsh/util)
+        :jsh/util)
 
 ;;; --- History entry accessors ---
 ;;; Entries are 3-element vectors: #(timestamp cwd command)

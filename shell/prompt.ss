@@ -1,11 +1,11 @@
-;;; prompt.ss — Prompt expansion (PS1/PS2/PS4) for gsh
+;;; prompt.ss — Prompt expansion (PS1/PS2/PS4) for jsh
 
 (export #t)
 (import :std/sugar
         :std/format
-        :gsh/ffi
-        :gsh/util
-        (only-in :gsh/expander find-matching-paren))
+        :jsh/ffi
+        :jsh/util
+        (only-in :jsh/expander find-matching-paren))
 
 ;;; --- Public interface ---
 
@@ -109,7 +109,7 @@
              ((#\r) (display "\r" out) (loop (+ i 2)))
              ;; Shell name
              ((#\s)
-              (display "gsh" out)
+              (display "jsh" out)
               (loop (+ i 2)))
              ;; Shell version
              ((#\v)

@@ -1,6 +1,6 @@
 #!chezscheme
-;;; pregexp-compat.sls — Re-export pregexp functions for gsh modules
-(library (gsh pregexp-compat)
+;;; pregexp-compat.sls — Re-export pregexp functions for jsh modules
+(library (jsh pregexp-compat)
   (export pregexp
           pregexp-match-positions
           pregexp-match

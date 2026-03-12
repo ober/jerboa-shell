@@ -2,6 +2,6 @@
 ;;; DO NOT EDIT — this file is overwritten by `make build` based on GSH_TIER.
 ;;; Tier: small — core shell + Gerbil eval
 (export #t)
-(import :gsh/registry
+(import :jsh/registry
         :gerbil/expander)
-(*gsh-tier* "small")
+(*jsh-tier* "small")

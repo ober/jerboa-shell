@@ -1,4 +1,4 @@
-;;; expander.ss — Word expansion for gsh
+;;; expander.ss — Word expansion for jsh
 ;;; Order: brace -> tilde -> parameter -> command-sub -> arithmetic
 ;;;        -> process-sub -> word-split -> pathname -> quote-removal
 
@@ -7,13 +7,13 @@
         :std/format
         ./pregexp-compat
         :std/srfi/1
-        :gsh/ast
-        :gsh/util
-        :gsh/environment
-        :gsh/ffi
-        :gsh/functions
-        :gsh/glob
-        :gsh/arithmetic)
+        :jsh/ast
+        :jsh/util
+        :jsh/environment
+        :jsh/ffi
+        :jsh/functions
+        :jsh/glob
+        :jsh/arithmetic)
 
 ;;; --- Latin-1 to UTF-8 re-decode ---
 ;;; ffi-read-all-from-fd uses char-string which decodes bytes as Latin-1.
@@ -40,7 +40,7 @@
 
 ;;; --- Nounset (set -u) error ---
 (def (nounset-error! name env)
-  (fprintf (current-error-port) "gsh: ~a: unbound variable~n" name)
+  (fprintf (current-error-port) "jsh: ~a: unbound variable~n" name)
   (raise (make-nounset-exception 1)))
 
 ;;; --- Double-quote context tracking ---
@@ -82,7 +82,7 @@
 ;; Create a temporary FIFO for process substitution
 (def (make-procsub-fifo!)
   (set! *procsub-counter* (+ *procsub-counter* 1))
-  (let ((path (string-append "/tmp/gsh-procsub-"
+  (let ((path (string-append "/tmp/jsh-procsub-"
                              (number->string (ffi-getpid)) "-"
                              (number->string *procsub-counter*))))
     (let ((rc (ffi-mkfifo path #o600)))
@@ -172,7 +172,7 @@
                                                (lambda (e)
                                                  (if (and (pair? e) (eq? (car e) 'failglob))
                                                    (begin
-                                                     (fprintf (current-error-port) "gsh: ~a: no match~n" (cdr e))
+                                                     (fprintf (current-error-port) "jsh: ~a: no match~n" (cdr e))
                                                      (raise e))
                                                    (raise e)))
                                                (lambda ()
@@ -983,7 +983,7 @@
                  (let* ((ref-name (env-get env iname))
                         ;; Bash error: indirect expansion of unset variable
                         (_ (when (not ref-name)
-                             (fprintf (current-error-port) "gsh: ~a: invalid indirect expansion~n" iname)
+                             (fprintf (current-error-port) "jsh: ~a: invalid indirect expansion~n" iname)
                              (raise (make-nounset-exception 1))))
                         ;; Validate ref-name is a valid variable name (or array ref)
                         ;; Bad names like "bad var name" or "/" must raise error
@@ -1745,14 +1745,14 @@
     ((:?) (if (colon-null? val)
             (let ((msg (if (string=? arg "") "parameter null or not set"
                          (expand-string arg env))))
-              (fprintf (current-error-port) "gsh: ~a: ~a~n" name msg)
+              (fprintf (current-error-port) "jsh: ~a: ~a~n" name msg)
               (raise (make-nounset-exception 1)))
             val))
     ;; ${name?word} — error if unset
     ((?) (if (not val)
            (let ((msg (if (string=? arg "") "parameter not set"
                         (expand-string arg env))))
-             (fprintf (current-error-port) "gsh: ~a: ~a~n" name msg)
+             (fprintf (current-error-port) "jsh: ~a: ~a~n" name msg)
              (raise (make-nounset-exception 1)))
            val))
     ;; ${name:+word} — alternate if set and non-null
@@ -1964,7 +1964,7 @@
   (*command-sub-ran* #t)
   (let ((exec-fn (*execute-input*)))
     (if exec-fn
-      ;; Use gsh's own executor: redirect stdout to a pipe, run command, read output
+      ;; Use jsh's own executor: redirect stdout to a pipe, run command, read output
       (with-catch
        (lambda (e) "")
        (lambda ()

@@ -1,12 +1,12 @@
-;;; lineedit.ss — Terminal line editor for gsh
+;;; lineedit.ss — Terminal line editor for jsh
 ;;; Custom line editor with emacs/vi modes, history, search, kill ring.
 
 (export #t)
 (import :std/sugar
         :std/format
-        :gsh/util
-        :gsh/history
-        :gsh/ffi)
+        :jsh/util
+        :jsh/history
+        :jsh/ffi)
 
 ;;; --- fzf callback hooks (set by fzf.ss at startup) ---
 ;;; These are set to actual functions after fzf.ss loads.

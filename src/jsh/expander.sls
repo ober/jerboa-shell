@@ -94,7 +94,7 @@
   (define (nounset-error! name env)
     (fprintf
       (current-error-port)
-      "gsh: ~a: unbound variable~n"
+      "jsh: ~a: unbound variable~n"
       name)
     (raise (make-nounset-exception 1)))
   (define *in-dquote-context* (make-parameter #f))
@@ -123,7 +123,7 @@
   (define (make-procsub-fifo!)
     (set! *procsub-counter* (+ *procsub-counter* 1))
     (let ([path (string-append
-                  "/tmp/gsh-procsub-"
+                  "/tmp/jsh-procsub-"
                   (number->string (ffi-getpid))
                   "-"
                   (number->string *procsub-counter*))])
@@ -210,7 +210,7 @@
                                                                                      (begin
                                                                                        (fprintf
                                                                                          (current-error-port)
-                                                                                         "gsh: ~a: no match~n"
+                                                                                         "jsh: ~a: no match~n"
                                                                                          (cdr e))
                                                                                        (raise
                                                                                          e))
@@ -1153,7 +1153,7 @@
                                (let* ([_ (when (not ref-name)
                                            (fprintf
                                              (current-error-port)
-                                             "gsh: ~a: invalid indirect expansion~n"
+                                             "jsh: ~a: invalid indirect expansion~n"
                                              iname)
                                            (raise
                                              (make-nounset-exception 1)))])
@@ -2163,7 +2163,7 @@
              (let ([msg (if (string=? arg "")
                             "parameter null or not set"
                             (expand-string arg env))])
-               (fprintf (current-error-port) "gsh: ~a: ~a~n" name msg)
+               (fprintf (current-error-port) "jsh: ~a: ~a~n" name msg)
                (raise (make-nounset-exception 1)))
              val)]
         [(?)
@@ -2171,7 +2171,7 @@
              (let ([msg (if (string=? arg "")
                             "parameter not set"
                             (expand-string arg env))])
-               (fprintf (current-error-port) "gsh: ~a: ~a~n" name msg)
+               (fprintf (current-error-port) "jsh: ~a: ~a~n" name msg)
                (raise (make-nounset-exception 1)))
              val)]
         [(:+)

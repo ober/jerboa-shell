@@ -1,25 +1,25 @@
-;;; executor.ss — Command dispatch and execution for gsh
+;;; executor.ss — Command dispatch and execution for jsh
 ;;; Walks the AST and executes commands.
 
 (export #t)
 (import :std/sugar
         :std/format
         ./pregexp-compat
-        :gsh/ast
-        :gsh/environment
-        :gsh/expander
-        :gsh/registry
-        :gsh/builtins
-        :gsh/functions
-        :gsh/pipeline
-        :gsh/redirect
-        :gsh/control
-        :gsh/jobs
-        :gsh/util
-        :gsh/arithmetic
-        :gsh/ffi
-        :gsh/glob
-        :gsh/signals)
+        :jsh/ast
+        :jsh/environment
+        :jsh/expander
+        :jsh/registry
+        :jsh/builtins
+        :jsh/functions
+        :jsh/pipeline
+        :jsh/redirect
+        :jsh/control
+        :jsh/jobs
+        :jsh/util
+        :jsh/arithmetic
+        :jsh/ffi
+        :jsh/glob
+        :jsh/signals)
 
 ;;; --- Public interface ---
 
@@ -71,7 +71,7 @@
     ((function-def? cmd) (execute-function-def cmd env))
     ((time-command? cmd) (execute-time-command cmd env))
     (else
-     (fprintf (current-error-port) "gsh: unknown command type~n")
+     (fprintf (current-error-port) "jsh: unknown command type~n")
      1)))
 
 ;;; --- Assignment helper ---
@@ -159,7 +159,7 @@
           (let ((status (if (pair? redirections)
                           (with-catch
                            (lambda (e)
-                             (fprintf (current-error-port) "gsh: ~a~n" (exception-message e))
+                             (fprintf (current-error-port) "jsh: ~a~n" (exception-message e))
                              1)
                            (lambda ()
                              (let ((saved (apply-redirections redirections env)))
@@ -205,7 +205,7 @@
                       (word-is-literal-empty? raw-words))
                ;; Literal '' or "" → command not found
                (begin
-                 (fprintf (current-error-port) "gsh: : command not found~n")
+                 (fprintf (current-error-port) "jsh: : command not found~n")
                  127)
                ;; Expansion produced empty (e.g. $(true)) → preserve $?
                (shell-environment-last-status env))
@@ -235,7 +235,7 @@
                             ((nounset-exception? e) (raise e))
                             ((subshell-exit-exception? e) (raise e))
                             (else
-                             (fprintf (current-error-port) "gsh: ~a~n" (exception-message e))
+                             (fprintf (current-error-port) "jsh: ~a~n" (exception-message e))
                              1)))
                         (lambda ()
                           ;; Special handling for exec builtin
@@ -384,11 +384,11 @@
                                (path-expand path) path))))
     (if (not path)
       (begin
-        (fprintf (current-error-port) "gsh: ~a: command not found~n" cmd-name)
+        (fprintf (current-error-port) "jsh: ~a: command not found~n" cmd-name)
         127)
       (with-catch
        (lambda (e)
-         (fprintf (current-error-port) "gsh: ~a: ~a~n" cmd-name (exception-message e))
+         (fprintf (current-error-port) "jsh: ~a: ~a~n" cmd-name (exception-message e))
          126)
        (lambda ()
          ;; If running inside a pipeline thread, dup2 the pipe fds onto
@@ -432,7 +432,7 @@
              (when in-pipeline? (mutex-unlock! *pipeline-fd-mutex*))
              (if (< pid 0)
                (begin
-                 (fprintf (current-error-port) "gsh: ~a: fork failed~n" cmd-name)
+                 (fprintf (current-error-port) "jsh: ~a: fork failed~n" cmd-name)
                  126)
                (let-values (((exit-code stopped?)
                              (wait-for-foreground-process-raw pid)))
@@ -494,7 +494,7 @@
        (if (pair? (cdr args))
          (parse-flags (cddr args) (cadr args) clear-env?)
          (begin
-           (fprintf (current-error-port) "gsh: exec: -a: option requires an argument~n")
+           (fprintf (current-error-port) "jsh: exec: -a: option requires an argument~n")
            1)))
       ;; -c (clear environment)
       ((string=? (car args) "-c")
@@ -514,7 +514,7 @@
            (path (which cmd-name)))
       (if (not path)
         (begin
-          (fprintf (current-error-port) "gsh: exec: ~a: not found~n" cmd-name)
+          (fprintf (current-error-port) "jsh: exec: ~a: not found~n" cmd-name)
           127)
         (let* ((exec-path (if (string-contains? path "/")
                             (path-expand path) path))
@@ -534,7 +534,7 @@
             (force-output (current-error-port))
             (let ((err (ffi-execve (string->c-safe exec-path) packed-argv packed-env)))
               ;; execve only returns on failure
-              (fprintf (current-error-port) "gsh: exec: ~a: ~a~n" cmd-name
+              (fprintf (current-error-port) "jsh: exec: ~a: ~a~n" cmd-name
                        (cond ((= err 13) "Permission denied")
                              ((= err 2) "No such file or directory")
                              (else (string-append "errno " (number->string err)))))
@@ -675,7 +675,7 @@
          ((nounset-exception? e) (raise e))
          ((subshell-exit-exception? e) (raise e))
          (else
-          (fprintf (current-error-port) "gsh: ~a~n" (exception-message e))
+          (fprintf (current-error-port) "jsh: ~a~n" (exception-message e))
           1)))
      (lambda ()
        (let ((saved (apply-redirections redirs env)))
@@ -788,7 +788,7 @@
      (let ((right (expand-word-nosplit right-raw env)))
        (with-catch
         (lambda (e)
-          (fprintf (current-error-port) "gsh: [[ =~ ]]: invalid regex: ~a~n" right)
+          (fprintf (current-error-port) "jsh: [[ =~ ]]: invalid regex: ~a~n" right)
           #f)
         (lambda ()
           (let ((m (pregexp-match right left)))
@@ -861,7 +861,7 @@
      (cond
        ((nounset-exception? e) (raise e))
        (else
-        (fprintf (current-error-port) "gsh: ~a~n" (exception-message e))
+        (fprintf (current-error-port) "jsh: ~a~n" (exception-message e))
         1)))
    (lambda ()
      (let* ((raw-expr (arith-command-expression cmd))
@@ -1169,7 +1169,7 @@
               ;; Fork failed — fall back to thread for error message
               (let* ((fake-pid (next-fake-pid!))
                      (th (spawn (lambda ()
-                                  (fprintf (current-error-port) "gsh: ~a: fork failed~n" cmd-name)
+                                  (fprintf (current-error-port) "jsh: ~a: fork failed~n" cmd-name)
                                   126))))
                 (cons fake-pid [(cons fake-pid th)]))
               (cons pid [(cons pid #f)])))

@@ -1,4 +1,4 @@
-;;; fuzzy.ss — Fuzzy matching engine for gsh
+;;; fuzzy.ss — Fuzzy matching engine for jsh
 ;;;
 ;;; Scoring algorithm inspired by fzf:
 ;;; - Boundary bonus (+8): match after / - _ . space
@@ -27,7 +27,7 @@
 (import :std/sugar
         :std/sort
         :std/srfi/1
-        :gsh/util)
+        :jsh/util)
 
 ;;;============================================================================
 ;;; Scoring constants

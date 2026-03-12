@@ -55,7 +55,7 @@
           (begin
             (fprintf
               (current-error-port)
-              "gsh: `~a': not a valid identifier~n"
+              "jsh: `~a': not a valid identifier~n"
               var-name)
             2)
           (let* ([word-list (for-command-words cmd)])

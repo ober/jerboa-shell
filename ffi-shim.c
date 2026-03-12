@@ -1,5 +1,5 @@
 /* ffi-shim.c -- POSIX FFI bindings for gherkin-shell
- * Compile: gcc -shared -fPIC -o libgsh-ffi.so src/gsh/ffi-shim.c -Wall -O2
+ * Compile: gcc -shared -fPIC -o libjsh-ffi.so src/jsh/ffi-shim.c -Wall -O2
  *
  * All functions are standard POSIX libc — no external libraries needed.
  * Functions prefixed with ffi_ to avoid symbol conflicts.

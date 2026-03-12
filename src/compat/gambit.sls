@@ -104,7 +104,7 @@
   ;; Must run before any foreign-procedure call in this or later libraries.
   (define _ffi-preload
     (begin
-      (guard (e (#t #f)) (load-shared-object "./libgsh-ffi.so"))
+      (guard (e (#t #f)) (load-shared-object "./libjsh-ffi.so"))
       (load-shared-object "")))
 
   ;; --- Variadic void ---
@@ -493,7 +493,7 @@
 
   ;; make-mutex: Gambit-compatible, returns a Chez native mutex.
   ;; We use Chez native mutexes (not gerbil-mutex wrappers) because compiled
-  ;; gsh code may exclude make-mutex from (compat gambit) and fall through to
+  ;; jsh code may exclude make-mutex from (compat gambit) and fall through to
   ;; (chezscheme)'s make-mutex. mutex-lock!/mutex-unlock! must handle both.
   (define (make-mutex . name)
     (if (pair? name)
@@ -554,7 +554,7 @@
           (hashtable-set! *process-pids* from-stdout pid)
           from-stdout))))
 
-  ;; waitpid via foreign-procedure (avoid circular dep on (gsh ffi))
+  ;; waitpid via foreign-procedure (avoid circular dep on (jsh ffi))
   (define c-do-waitpid (foreign-procedure "ffi_do_waitpid" (int int) int))
   (define c-get-waitpid-status (foreign-procedure "ffi_get_waitpid_status" () int))
 
@@ -638,7 +638,7 @@
   ;; --- Terminal control ---
   ;; Gambit tty-mode-set!: (tty-mode-set! port input-echo input-line output-raw output-line speed)
   ;; Maps to POSIX termios via FFI.
-  ;; Uses foreign-procedure directly to avoid circular dependency with (gsh ffi).
+  ;; Uses foreign-procedure directly to avoid circular dependency with (jsh ffi).
   (define c-ffi-set-raw-mode (foreign-procedure "ffi_set_raw_mode" (int) int))
   (define c-ffi-termios-restore (foreign-procedure "ffi_termios_restore" (int int) int))
 
@@ -772,7 +772,7 @@
       v))
 
   ;; --- Gambit introspection stubs ---
-  ;; These are Gambit internals used by gsh's ,room command.
+  ;; These are Gambit internals used by jsh's ,room command.
   ;; Provide reasonable Chez equivalents.
   (define (\x23;\x23;get-live-percent)
     ;; Approximate: ratio of current heap to maximum

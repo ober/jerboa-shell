@@ -9,11 +9,11 @@ LIBDIRS_JSH = src:$(JERBOA):$(GHERKIN)
 
 all: ffi jerboa compile
 
-# ─── Legacy gsh targets (submodule-based) ────────────────────────────────────
+# ─── Legacy jsh targets (submodule-based) ────────────────────────────────────
 
 ffi:
 	@echo "=== Building FFI shim ==="
-	gcc -shared -fPIC -o libgsh-ffi.so ffi-shim.c
+	gcc -shared -fPIC -o libjsh-ffi.so ffi-shim.c
 
 jerboa:
 	@echo "=== Translating .ss → .sls via Gherkin compiler (with Jerboa imports) ==="
@@ -24,10 +24,10 @@ compile:
 	$(SCHEME) -q --libdirs $(LIBDIRS) --compile-imported-libraries < build-all.ss
 
 run:
-	LD_LIBRARY_PATH=. $(SCHEME) --libdirs $(LIBDIRS) --program gsh.ss
+	LD_LIBRARY_PATH=. $(SCHEME) --libdirs $(LIBDIRS) --program jsh.ss
 
 binary: all
-	@echo "=== Building standalone gsh binary ==="
+	@echo "=== Building standalone jsh binary ==="
 	LD_LIBRARY_PATH=. $(SCHEME) -q --libdirs $(LIBDIRS) < build-binary.ss
 
 # ─── jsh targets (inline source, no submodule) ───────────────────────────────
@@ -58,7 +58,7 @@ compat-test:
 	python3 gerbil-shell/test/gen_compat_report.py \
 	  /home/jafourni/mine/gerbil-shell/_vendor/oils \
 	  ./jsh \
-	  gerbil-shell/.gerbil/bin/gsh 2>/dev/null || \
+	  gerbil-shell/.gerbil/bin/jsh 2>/dev/null || \
 	python3 gerbil-shell/test/run_spec.py \
 	  /home/jafourni/mine/gerbil-shell/_vendor/oils/spec/builtin-echo.test.sh \
 	  ./jsh
@@ -68,11 +68,11 @@ compat-test:
 clean:
 	find src -name "*.so" -delete 2>/dev/null || true
 	find src -name "*.wpo" -delete 2>/dev/null || true
-	rm -f libgsh-ffi.so jsh-all.so jsh.wpo jsh.boot jsh
-	# Remove auto-generated gsh .sls files (keep handwritten ones)
+	rm -f libjsh-ffi.so jsh-all.so jsh.wpo jsh.boot jsh
+	# Remove auto-generated jsh .sls files (keep handwritten ones)
 	@for f in ast registry macros util environment lexer arithmetic glob \
 	          fuzzy history parser functions signals expander redirect \
 	          control jobs builtins pipeline executor completion prompt \
 	          lineedit fzf script startup main; do \
-		rm -f src/gsh/$$f.sls; \
+		rm -f src/jsh/$$f.sls; \
 	done

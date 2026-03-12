@@ -1,11 +1,11 @@
-;;; macros.ss — Shell-specific macros for gsh
+;;; macros.ss — Shell-specific macros for jsh
 ;;;
 ;;; This module provides macros to reduce code bloat and improve maintainability
-;;; across the gsh codebase. See refactor.md for analysis and rationale.
+;;; across the jsh codebase. See refactor.md for analysis and rationale.
 
 (export #t)
 (import :std/sugar
-        :gsh/registry)
+        :jsh/registry)
 
 ;;; --- Builtin Registration ---
 

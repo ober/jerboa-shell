@@ -7,11 +7,11 @@
 
 (export register-coreutils!)
 
-(import :gsh/registry
+(import :jsh/registry
         ;; Each coreutils module exports `main`. Use rename-in to avoid conflicts
         ;; and ensure runtime loading (only-in without names doesn't link modules).
         ;;
-        ;; Skipped (native gsh builtins): true, false, echo, printf, pwd, test, kill
+        ;; Skipped (native jsh builtins): true, false, echo, printf, pwd, test, kill
         ;;
         ;; --- Phase 1: Trivial ---
         (rename-in :gerbil-coreutils/basename (main cu-basename))
@@ -155,7 +155,7 @@
         (if (fixnum? status) status 0)))))
 
 ;;; Register all coreutils commands as shell builtins.
-;;; Skips commands gsh already implements natively (true, false, echo, pwd, printf, test, kill).
+;;; Skips commands jsh already implements natively (true, false, echo, pwd, printf, test, kill).
 (def (register-coreutils!)
   (for-each
    (lambda (entry)

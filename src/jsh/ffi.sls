@@ -1,6 +1,6 @@
 #!chezscheme
 ;;; ffi.sls -- Chez Scheme FFI bindings for gherkin-shell
-;;; Wraps libgsh-ffi.so (compiled from ffi-shim.c)
+;;; Wraps libjsh-ffi.so (compiled from ffi-shim.c)
 
 (library (jsh ffi)
   (export
@@ -48,11 +48,11 @@
 
   ;; Load FFI symbols.
   ;; 1. dlopen(NULL) — resolves symbols linked into the binary (-rdynamic)
-  ;; 2. If ./libgsh-ffi.so exists, load it (interpreted mode via LD_LIBRARY_PATH or cwd)
+  ;; 2. If ./libjsh-ffi.so exists, load it (interpreted mode via LD_LIBRARY_PATH or cwd)
   (define _ffi-lib (load-shared-object ""))
   (define _ffi-lib-so
-    (if (file-exists? "./libgsh-ffi.so")
-      (load-shared-object "./libgsh-ffi.so")
+    (if (file-exists? "./libjsh-ffi.so")
+      (load-shared-object "./libjsh-ffi.so")
       (void)))
 
   ;; --- Wait flags ---

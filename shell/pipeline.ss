@@ -1,4 +1,4 @@
-;;; pipeline.ss — Pipe management for gsh
+;;; pipeline.ss — Pipe management for jsh
 ;;; Connects N commands in a pipeline using OS pipes.
 ;;;
 ;;; Strategy: for each command, dup2 the appropriate pipe fds onto real fds 0/1,
@@ -9,15 +9,15 @@
 (export #t)
 (import :std/sugar
         :std/format
-        :gsh/ast
-        :gsh/ffi
-        :gsh/environment
-        :gsh/expander
-        :gsh/redirect
-        :gsh/registry
-        :gsh/builtins
-        :gsh/functions
-        :gsh/util)
+        :jsh/ast
+        :jsh/ffi
+        :jsh/environment
+        :jsh/expander
+        :jsh/redirect
+        :jsh/registry
+        :jsh/builtins
+        :jsh/functions
+        :jsh/util)
 
 ;;; --- Helpers ---
 

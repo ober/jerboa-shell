@@ -1,21 +1,21 @@
-;;; script.ss — Script execution for gsh
+;;; script.ss — Script execution for jsh
 ;;; Handles running script files and sourcing files into the current environment.
 
 (export #t)
 (import :std/sugar
         :std/format
         :gerbil/runtime/init
-        :gsh/util
-        :gsh/ast
-        :gsh/environment
-        :gsh/functions
-        :gsh/lexer
-        :gsh/parser
-        :gsh/executor
-        :gsh/signals
-        :gsh/jobs
-        :gsh/static-compat
-        :gsh/registry)
+        :jsh/util
+        :jsh/ast
+        :jsh/environment
+        :jsh/functions
+        :jsh/lexer
+        :jsh/parser
+        :jsh/executor
+        :jsh/signals
+        :jsh/jobs
+        :jsh/static-compat
+        :jsh/registry)
 
 ;;; --- Meta-command handler (set by main.ss to wire up ,compile etc.) ---
 
@@ -30,7 +30,7 @@
    Gerbil syntax (def, defstruct, hash, match, import, etc.).
    Called lazily to avoid ~100ms startup cost for normal shell operations.
    Blocked in the 'tiny' tier which has no eval support."
-  (when (string=? (*gsh-tier*) "tiny")
+  (when (string=? (*jsh-tier*) "tiny")
     (error "Gerbil eval not available in this build (tier: tiny). Rebuild with GSH_TIER=small or higher"))
   (unless *gerbil-eval-initialized*
     (set! *gerbil-eval-initialized* #t)
@@ -173,7 +173,7 @@
 (def (execute-script filename args env)
   (if (not (file-exists? filename))
     (begin
-      (fprintf (current-error-port) "gsh: ~a: No such file or directory~n" filename)
+      (fprintf (current-error-port) "jsh: ~a: No such file or directory~n" filename)
       127)
     (with-catch
      (lambda (e)
@@ -183,7 +183,7 @@
          ((subshell-exit-exception? e) (subshell-exit-exception-status e))
          ((nounset-exception? e) (nounset-exception-status e))
          (else
-          (fprintf (current-error-port) "gsh: ~a: ~a~n" filename (exception-message e))
+          (fprintf (current-error-port) "jsh: ~a: ~a~n" filename (exception-message e))
           1)))
      (lambda ()
        (let* ((content (read-file-to-string filename))
@@ -206,7 +206,7 @@
 (def (source-file! filename env)
   (if (not (file-exists? filename))
     (begin
-      (fprintf (current-error-port) "gsh: ~a: No such file or directory~n" filename)
+      (fprintf (current-error-port) "jsh: ~a: No such file or directory~n" filename)
       1)
     (with-catch
      (lambda (e)
@@ -220,7 +220,7 @@
          ((subshell-exit-exception? e) (raise e))
          ((nounset-exception? e) (raise e))
          (else
-          (fprintf (current-error-port) "gsh: ~a: ~a~n" filename (exception-message e))
+          (fprintf (current-error-port) "jsh: ~a: ~a~n" filename (exception-message e))
           1)))
      (lambda ()
        (let* ((content (read-file-to-string filename))
@@ -272,7 +272,7 @@
     (let loop ((status initial-status))
       (let ((cmd (with-catch
                   (lambda (e)
-                    (fprintf (current-error-port) "gsh: syntax error: ~a~n"
+                    (fprintf (current-error-port) "jsh: syntax error: ~a~n"
                              (exception-message e))
                     'error)
                   (lambda ()
@@ -288,7 +288,7 @@
           ;; Unterminated quote/construct after parsing — syntax error
           ((lexer-want-more? lexer)
            (fprintf (current-error-port)
-                    "gsh: syntax error: unexpected end of file~n")
+                    "jsh: syntax error: unexpected end of file~n")
            (env-set-last-status! env 2)
            2)
           (else
@@ -312,7 +312,7 @@
                         (let ((msg (exception-message e)))
                           (with-catch (lambda (_) #!void)
                             (lambda ()
-                              (fprintf (current-error-port) "gsh: ~a~n" msg)))
+                              (fprintf (current-error-port) "jsh: ~a~n" msg)))
                           ;; POSIX: syntax errors / unclosed bad substitution → exit code 2
                           (if (and (string? msg)
                                    (or (string-prefix? "parse error" msg)

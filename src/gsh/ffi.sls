@@ -2,7 +2,7 @@
 ;;; ffi.sls -- Chez Scheme FFI bindings for gherkin-shell
 ;;; Wraps libgsh-ffi.so (compiled from ffi-shim.c)
 
-(library (gsh ffi)
+(library (jsh ffi)
   (export
     ;; waitpid
     ffi-waitpid-pid ffi-waitpid-status

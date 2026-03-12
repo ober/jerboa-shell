@@ -36,13 +36,13 @@
     (collect-vendor-objs "_vendor/gerbil-runtime")
     ""))
 
-;; Collect gsh-dlopen .o files for linking (static builds, small+ tiers)
+;; Collect jsh-dlopen .o files for linking (static builds, small+ tiers)
 ;; Provides dlopen/dlsym/dlclose/dlerror that override musl's weak stubs,
 ;; enabling .o1 loading in the static binary
-(def gsh-dlopen-ld-opts
+(def jsh-dlopen-ld-opts
   (if (and (getenv "GSH_STATIC" #f)
            (not (string=? tier "tiny")))
-    (collect-vendor-objs "_vendor/gsh-dlopen")
+    (collect-vendor-objs "_vendor/jsh-dlopen")
     ""))
 
 ;; GSH_STATIC=1 adds -static for static binary builds
@@ -103,8 +103,8 @@
     (append core-modules
             tier-modules
             `("stage"
-              (exe: "main" bin: "gsh" optimize: #t debug: 'env
-                    "-ld-options" ,(string-append static-ld-opts pcre2-ld-opts gsh-dlopen-ld-opts " " gambitgsc-ld-opts " " gerbil-runtime-ld-opts))))))
+              (exe: "main" bin: "jsh" optimize: #t debug: 'env
+                    "-ld-options" ,(string-append static-ld-opts pcre2-ld-opts jsh-dlopen-ld-opts " " gambitgsc-ld-opts " " gerbil-runtime-ld-opts))))))
 
 (defbuild-script
   all-modules

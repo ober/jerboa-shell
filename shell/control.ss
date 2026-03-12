@@ -1,13 +1,13 @@
-;;; control.ss -- Compound commands (if/for/while/until/case/select) for gsh
+;;; control.ss -- Compound commands (if/for/while/until/case/select) for jsh
 
 (export #t)
 (import :std/sugar
         :std/format
-        :gsh/ast
-        :gsh/environment
-        :gsh/expander
-        :gsh/glob
-        :gsh/functions)
+        :jsh/ast
+        :jsh/environment
+        :jsh/expander
+        :jsh/glob
+        :jsh/functions)
 
 ;; Wrap a thunk in a loop context (increments loop depth)
 (def (with-loop-context thunk)
@@ -41,7 +41,7 @@
     ;; Validate variable name
     (if (not (valid-identifier? var-name))
       (begin
-        (fprintf (current-error-port) "gsh: `~a': not a valid identifier~n" var-name)
+        (fprintf (current-error-port) "jsh: `~a': not a valid identifier~n" var-name)
         2)
       (let* ((word-list (for-command-words cmd))
              ;; If words is #f, use positional params ("$@")

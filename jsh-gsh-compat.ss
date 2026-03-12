@@ -1,13 +1,13 @@
 #!chezscheme
 ;; Entry point for jerboa-shell
-(import (chezscheme) (gsh main) (except (gsh builtins) list-head)
-        (gsh registry) (gsh script)
+(import (chezscheme) (jsh main) (except (jsh builtins) list-head)
+        (jsh registry) (jsh script)
         (only (compiler compile) gerbil-compile-top)
         (only (reader reader) gerbil-read))
 
 ;; Set tier and force builtin registration
-(*gsh-tier* "small")
-;; Touch a builtins export to force Chez to invoke (gsh builtins),
+(*jsh-tier* "small")
+;; Touch a builtins export to force Chez to invoke (jsh builtins),
 ;; which runs the defbuiltin registration side effects.
 (let () special-builtin? (void))
 
@@ -287,7 +287,7 @@
                 (result (gerbil-eval-forms gerbil-forms)))
            (cons (format-result result) 0))]))))
 
-;; Get args from GSH_ARGC/GSH_ARGn env vars (set by gsh-main.c)
+;; Get args from GSH_ARGC/GSH_ARGn env vars (set by jsh-main.c)
 ;; or fall back to (command-line) for interpreted mode.
 (define (get-real-args)
   (let ((argc-str (getenv "GSH_ARGC")))

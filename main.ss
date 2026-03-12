@@ -1,4 +1,4 @@
-;;; main.ss — Entry point and REPL loop for gsh
+;;; main.ss — Entry point and REPL loop for jsh
 ;;; The main executable target.
 ;;;
 ;;; Compiler and coreutils support is optional — controlled by the build tier.
@@ -8,29 +8,29 @@
 (export main)
 (import :std/sugar
         :std/format
-        :gsh/util
-        :gsh/ast
-        :gsh/environment
-        :gsh/lexer
-        :gsh/parser
-        :gsh/executor
-        :gsh/expander
-        :gsh/functions
-        :gsh/registry
-        :gsh/builtins
-        :gsh/history
-        :gsh/prompt
-        :gsh/fuzzy
-        :gsh/lineedit
-        :gsh/fzf
-        :gsh/completion
-        :gsh/signals
-        :gsh/jobs
-        :gsh/script
-        :gsh/startup
-        :gsh/arithmetic
-        :gsh/ffi
-        :gsh/stage)
+        :jsh/util
+        :jsh/ast
+        :jsh/environment
+        :jsh/lexer
+        :jsh/parser
+        :jsh/executor
+        :jsh/expander
+        :jsh/functions
+        :jsh/registry
+        :jsh/builtins
+        :jsh/history
+        :jsh/prompt
+        :jsh/fuzzy
+        :jsh/lineedit
+        :jsh/fzf
+        :jsh/completion
+        :jsh/signals
+        :jsh/jobs
+        :jsh/script
+        :jsh/startup
+        :jsh/arithmetic
+        :jsh/ffi
+        :jsh/stage)
 
 ;;; --- CLI argument parsing ---
 
@@ -112,7 +112,7 @@
                          args)))
              (if (null? args)
                (begin
-                 (fprintf (current-error-port) "gsh: source: filename argument required~n")
+                 (fprintf (current-error-port) "jsh: source: filename argument required~n")
                  2)
                (let* ((filename (car args))
                       ;; Search PATH if file doesn't contain /
@@ -139,7 +139,7 @@
     ;; Set shell-specific defaults
     ;; SHELL should point to this shell, not the parent shell.
     ;; (command-line) returns /proc/self/fd/N (memfd) in the embedded binary,
-    ;; so gsh-main.c sets GSH_EXE via readlink(/proc/self/exe).
+    ;; so jsh-main.c sets GSH_EXE via readlink(/proc/self/exe).
     (env-set! env "SHELL"
               (or (getenv "GSH_EXE" #f)
                   (path-normalize (car (command-line)))))
@@ -250,7 +250,7 @@
            ;; history-expand returns (cons expanded-string execute?)
            (let ((result (with-catch
                            (lambda (e)
-                             (fprintf (current-error-port) "gsh: ~a~n"
+                             (fprintf (current-error-port) "jsh: ~a~n"
                                       (exception-message e))
                              #f)
                            (lambda () (history-expand input)))))
@@ -314,7 +314,7 @@
          ((return-exception? e) (raise e))
          (else
           (let ((msg (exception-message e)))
-            (fprintf (current-error-port) "gsh: ~a~n" msg)
+            (fprintf (current-error-port) "jsh: ~a~n" msg)
             ;; POSIX: syntax errors / unclosed bad substitution -> exit code 2
             (if (and (string? msg)
                      (or (string-prefix? "parse error" msg)
@@ -323,7 +323,7 @@
      (lambda ()
        (let ((cmd (with-catch
                    (lambda (e)
-                     (fprintf (current-error-port) "gsh: syntax error: ~a~n"
+                     (fprintf (current-error-port) "jsh: syntax error: ~a~n"
                               (exception-message e))
                      'error)
                    (lambda ()
@@ -457,7 +457,7 @@
                              ((return-exception? e) (return-exception-status e))
                              (else
                               (let ((msg (exception-message e)))
-                                (fprintf (current-error-port) "gsh: ~a~n" msg)
+                                (fprintf (current-error-port) "jsh: ~a~n" msg)
                                 ;; POSIX: syntax errors / unclosed bad substitution -> exit code 2
                                 (if (and (string? msg)
                                          (or (string-prefix? "parse error" msg)

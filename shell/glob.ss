@@ -1,11 +1,11 @@
-;;; glob.ss — Pathname expansion (globbing) for gsh
+;;; glob.ss — Pathname expansion (globbing) for jsh
 
 (export #t)
 (import ./pregexp-compat
         :std/sort
         :std/sugar
         :std/iter
-        :gsh/util)
+        :jsh/util)
 
 ;;; --- Public interface ---
 

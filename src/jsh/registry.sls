@@ -1,6 +1,6 @@
 #!chezscheme
 (library (jsh registry)
-  (export *gsh-tier* *builtins* builtin-register!
+  (export *jsh-tier* *builtins* builtin-register!
     builtin-lookup builtin-list builtin?)
   (import
     (except (chezscheme) box box? unbox set-box! andmap ormap
@@ -28,7 +28,7 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp))
-  (define *gsh-tier* (make-parameter "tiny"))
+  (define *jsh-tier* (make-parameter "tiny"))
   (define *builtins* (make-hash-table))
   (define (builtin-register! name handler)
     (hash-put! *builtins* name handler))

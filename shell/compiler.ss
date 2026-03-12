@@ -1,4 +1,4 @@
-;;; compiler.ss — Gerbil compiler integration for gsh
+;;; compiler.ss — Gerbil compiler integration for jsh
 ;;; Embeds the Gerbil compiler so users can compile and load .ss modules
 ;;; from within the shell, without needing a separate gxc installation.
 ;;;
@@ -13,10 +13,10 @@
 (export ensure-gerbil-compiler!
         gsc-available?
         embedded-compile-file?
-        gsh-compile
-        gsh-load
-        gsh-use
-        gsh-show-exports
+        jsh-compile
+        jsh-load
+        jsh-use
+        jsh-show-exports
         handle-meta-command)
 
 (import :std/sugar
@@ -25,10 +25,10 @@
         :gerbil/runtime/loader
         :gerbil/expander
         :gerbil/compiler
-        :gsh/static-compat
-        :gsh/util
-        :gsh/registry
-        :gsh/script)
+        :jsh/static-compat
+        :jsh/util
+        :jsh/registry
+        :jsh/script)
 
 ;;; --- Lazy initialization ---
 
@@ -69,7 +69,7 @@
 
 (def (compile-scm-files outdir modpath)
   "Compile generated .scm files to .o1 using in-process compile-file.
-   modpath is the module path (e.g. \"gsh/bench\") — may include package prefix.
+   modpath is the module path (e.g. \"jsh/bench\") — may include package prefix.
    Compiles modpath.scm and all modpath~N.scm parts."
   (let* ((cf (eval 'compile-file))
          ;; Module path uses / separator, maps to directory structure
@@ -88,7 +88,7 @@
 
 ;;; --- Compile ---
 
-(def (gsh-compile srcpath
+(def (jsh-compile srcpath
                   output-dir: (output-dir #f)
                   invoke-gsc: (invoke-gsc 'auto)
                   verbose: (verbose #f))
@@ -134,7 +134,7 @@
                    (with-catch
                     (lambda (e)
                       (fprintf (current-error-port)
-                               "gsh: native compile failed, using .scm: ~a~n" e)
+                               "jsh: native compile failed, using .scm: ~a~n" e)
                       #f)
                     (lambda ()
                       (compile-scm-files outdir modpath)
@@ -145,7 +145,7 @@
 
 ;;; --- Load ---
 
-(def (gsh-load modpath libdir: (libdir #f) native-preloaded: (native-preloaded #f))
+(def (jsh-load modpath libdir: (libdir #f) native-preloaded: (native-preloaded #f))
   "Load a compiled Gerbil module and import into the eval context.
    modpath is like \"test-mod\" or \"mylib/foo\".
    When native-preloaded is #t, the module's .o1 was already loaded via
@@ -193,14 +193,14 @@
 
 ;;; --- Use (compile + load) ---
 
-(def (gsh-use srcpath
+(def (jsh-use srcpath
               output-dir: (output-dir #f)
               verbose: (verbose #f))
   "Compile and load a Gerbil source file in one step.
    Returns the module path string."
   (ensure-gerbil-compiler!)
   (let* ((srcpath (path-normalize srcpath)))
-    (let-values (((outdir native?) (gsh-compile srcpath
+    (let-values (((outdir native?) (jsh-compile srcpath
                                                   output-dir: output-dir
                                                   verbose: verbose)))
       (unless (member outdir (load-path))
@@ -221,12 +221,12 @@
                     (with-catch
                      (lambda (e) #f)
                      (lambda () (load-module modpath) #t)))))
-          (gsh-load modpath native-preloaded: preloaded)
+          (jsh-load modpath native-preloaded: preloaded)
           modpath)))))
 
 ;;; --- Show exports ---
 
-(def (gsh-show-exports modpath)
+(def (jsh-show-exports modpath)
   "List the exports of a module."
   (ensure-gerbil-compiler!)
   (let ((ctx (with-catch (lambda (e) #f)
@@ -234,7 +234,7 @@
                  (import-module (string->symbol (string-append ":" modpath)))))))
     (if (not ctx)
       (begin
-        (fprintf (current-error-port) "gsh: cannot resolve module ~a~n" modpath)
+        (fprintf (current-error-port) "jsh: cannot resolve module ~a~n" modpath)
         1)
       (let ((exports (module-context-export ctx)))
         (for-each
@@ -267,7 +267,7 @@
           (meta-cmd-wrap
            (lambda ()
              (let-values (((path verbose no-gsc) (parse-compile-args arg)))
-               (gsh-compile path
+               (jsh-compile path
                             invoke-gsc: (if no-gsc #f 'auto)
                             verbose: verbose))))))
     ((meta-cmd-match expr-str "load ")
@@ -275,17 +275,17 @@
           (meta-cmd-wrap
            (lambda ()
              (let-values (((modpath libdir) (parse-load-args arg)))
-               (gsh-load modpath libdir: libdir))))))
+               (jsh-load modpath libdir: libdir))))))
     ((meta-cmd-match expr-str "use ")
      => (lambda (arg)
           (meta-cmd-wrap
            (lambda ()
-             (gsh-use (parse-path-arg arg))))))
+             (jsh-use (parse-path-arg arg))))))
     ((meta-cmd-match expr-str "exports ")
      => (lambda (arg)
           (meta-cmd-wrap
            (lambda ()
-             (gsh-show-exports (string-trim-whitespace arg))))))
+             (jsh-show-exports (string-trim-whitespace arg))))))
     (else #f)))
 
 (def (meta-cmd-match str prefix)
@@ -357,19 +357,19 @@
         (cond
           ((null? args)
            (fprintf (current-error-port)
-                    "gsh: gsc-compile: missing file argument~n")
+                    "jsh: gsc-compile: missing file argument~n")
            2)
           ((string=? (car args) "-v") (loop (cdr args) #t no-gsc))
           ((string=? (car args) "-n") (loop (cdr args) verbose #t))
           (else
            (with-catch
             (lambda (e)
-              (fprintf (current-error-port) "gsh: gsc-compile: ~a~n"
+              (fprintf (current-error-port) "jsh: gsc-compile: ~a~n"
                        (call-with-output-string
                         (lambda (p) (display-exception e p))))
               1)
             (lambda ()
-              (gsh-compile (car args)
+              (jsh-compile (car args)
                            invoke-gsc: (if no-gsc #f 'auto)
                            verbose: verbose)
               0))))))))
@@ -387,23 +387,23 @@
            (if modpath
              (with-catch
               (lambda (e)
-                (fprintf (current-error-port) "gsh: gsc-load: ~a~n"
+                (fprintf (current-error-port) "jsh: gsc-load: ~a~n"
                          (call-with-output-string
                           (lambda (p) (display-exception e p))))
                 1)
               (lambda ()
-                (gsh-load modpath libdir: libdir)
+                (jsh-load modpath libdir: libdir)
                 0))
              (begin
                (fprintf (current-error-port)
-                        "gsh: gsc-load: missing module path~n")
+                        "jsh: gsc-load: missing module path~n")
                2)))
           ((string=? (car args) "-L")
            (if (pair? (cdr args))
              (loop (cddr args) modpath (cadr args))
              (begin
                (fprintf (current-error-port)
-                        "gsh: gsc-load: -L requires directory argument~n")
+                        "jsh: gsc-load: -L requires directory argument~n")
                2)))
           (else
            (loop (cdr args) (or modpath (car args)) libdir)))))))
@@ -417,9 +417,9 @@
         2)
       (with-catch
        (lambda (e)
-         (fprintf (current-error-port) "gsh: gsc-exports: ~a~n"
+         (fprintf (current-error-port) "jsh: gsc-exports: ~a~n"
                   (call-with-output-string
                    (lambda (p) (display-exception e p))))
          1)
        (lambda ()
-         (gsh-show-exports (car args)))))))
+         (jsh-show-exports (car args)))))))

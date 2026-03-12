@@ -51,7 +51,7 @@
                      v)]))
   (define (ensure-gerbil-eval!)
     "Initialize the Gerbil expander on first use so eval supports full\n   Gerbil syntax (def, defstruct, hash, match, import, etc.).\n   Called lazily to avoid ~100ms startup cost for normal shell operations.\n   Blocked in the 'tiny' tier which has no eval support."
-    (when (string=? (*gsh-tier*) "tiny")
+    (when (string=? (*jsh-tier*) "tiny")
       (error 'gerbil
         "Gerbil eval not available in this build (tier: tiny). Rebuild with GSH_TIER=small or higher"))
     (unless *gerbil-eval-initialized*
@@ -305,7 +305,7 @@
         (begin
           (fprintf
             (current-error-port)
-            "gsh: ~a: No such file or directory~n"
+            "jsh: ~a: No such file or directory~n"
             filename)
           127)
         (guard (__exn
@@ -321,7 +321,7 @@
                        [else
                         (fprintf
                           (current-error-port)
-                          "gsh: ~a: ~a~n"
+                          "jsh: ~a: ~a~n"
                           filename
                           (exception-message e))
                         1]))
@@ -339,7 +339,7 @@
         (begin
           (fprintf
             (current-error-port)
-            "gsh: ~a: No such file or directory~n"
+            "jsh: ~a: No such file or directory~n"
             filename)
           1)
         (guard (__exn
@@ -355,7 +355,7 @@
                        [else
                         (fprintf
                           (current-error-port)
-                          "gsh: ~a: ~a~n"
+                          "jsh: ~a: ~a~n"
                           filename
                           (exception-message e))
                         1]))
@@ -542,7 +542,7 @@
                              ((lambda (e)
                                 (fprintf
                                   (current-error-port)
-                                  "gsh: syntax error: ~a~n"
+                                  "jsh: syntax error: ~a~n"
                                   (exception-message e))
                                 'error)
                                __exn)])
@@ -560,7 +560,7 @@
             [(lexer-want-more? lexer)
              (fprintf
                (current-error-port)
-               "gsh: syntax error: unexpected end of file~n")
+               "jsh: syntax error: unexpected end of file~n")
              (env-set-last-status! env 2)
              2]
             [else
@@ -594,7 +594,7 @@
                                                              __exn)])
                                                    (fprintf
                                                      (current-error-port)
-                                                     "gsh: ~a~n"
+                                                     "jsh: ~a~n"
                                                      msg))
                                                  (if (and (string? msg)
                                                           (or (let ([pfx "parse error"]

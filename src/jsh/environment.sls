@@ -852,7 +852,7 @@
         "HISTFILE"
         (string-append
           (or (getenv "HOME" #f) ".")
-          "/.gsh_history")))
+          "/.jsh_history")))
     (unless (env-get-local env "HISTSIZE")
       (env-set! env "HISTSIZE" "1000"))
     (unless (env-get-local env "HISTFILESIZE")
@@ -893,7 +893,7 @@
         (env-set! env "SHLVL" (number->string (+ shlvl 1)))
         (env-export! env "SHLVL")))
     (env-set! env "PPID" (number->string (ffi-getppid)))
-    (env-set! env "SHELL" (or (getenv "SHELL" #f) "/bin/gsh"))
+    (env-set! env "SHELL" (or (getenv "SHELL" #f) "/bin/jsh"))
     (env-option-set! env "hashall" #t)
     (env-option-set! env "braceexpand" #t)
     (env-option-set! env "interactive-comments" #t)
@@ -1304,7 +1304,7 @@
     (define shell-environment:::init!
       (case-lambda
         [(self)
-         (let* ([parent #f] [name "gsh"])
+         (let* ([parent #f] [name "jsh"])
            (slot-set! self 'vars (make-hash-table))
            (slot-set! self 'parent parent)
            (slot-set!
@@ -1369,7 +1369,7 @@
              'dir-stack
              (if parent (shell-environment-dir-stack parent) (list))))]
         [(self parent)
-         (let* ([name "gsh"])
+         (let* ([name "jsh"])
            (slot-set! self 'vars (make-hash-table))
            (slot-set! self 'parent parent)
            (slot-set!

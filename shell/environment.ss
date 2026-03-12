@@ -1,4 +1,4 @@
-;;; environment.ss — Shell variables & environment for gsh
+;;; environment.ss — Shell variables & environment for jsh
 
 (export #t)
 (import :std/sugar
@@ -6,7 +6,7 @@
         :std/format
         :std/sort
         :std/misc/hash
-        :gsh/ffi)
+        :jsh/ffi)
 
 ;;; --- Callback parameter for execute-input ---
 ;;; Breaks circular dependency: builtins.ss and expander.ss need to call
@@ -100,7 +100,7 @@
   transparent: #t)
 
 (defmethod {:init! shell-environment}
-  (lambda (self parent: (parent #f) name: (name "gsh"))
+  (lambda (self parent: (parent #f) name: (name "jsh"))
     (set! self.vars (make-hash-table))
     (set! self.parent parent)
     (set! self.functions (if parent (shell-environment-functions parent) (make-hash-table)))
@@ -575,7 +575,7 @@
   ;; Set PPID
   (env-set! env "PPID" (number->string (##os-getppid)))
   ;; Set shell-specific vars
-  (env-set! env "SHELL" (or (getenv "SHELL" #f) "/bin/gsh"))
+  (env-set! env "SHELL" (or (getenv "SHELL" #f) "/bin/jsh"))
   ;; Default shell options
   (env-option-set! env "hashall" #t)
   (env-option-set! env "braceexpand" #t)

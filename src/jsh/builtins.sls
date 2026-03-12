@@ -3152,7 +3152,7 @@
                              (begin
                                (fprintf
                                  (current-error-port)
-                                 "gsh: export: ~a: not a valid identifier~n"
+                                 "jsh: export: ~a: not a valid identifier~n"
                                  arg)
                                (set! status 2))
                              (env-export! env name value))))
@@ -3183,7 +3183,7 @@
                       (begin
                         (fprintf
                           (current-error-port)
-                          "gsh: unset: `~a': not a valid identifier~n"
+                          "jsh: unset: `~a': not a valid identifier~n"
                           name)
                         (set! status 1))
                       (guard (__exn
@@ -3191,7 +3191,7 @@
                                 ((lambda (e)
                                    (fprintf
                                      (current-error-port)
-                                     "gsh: unset: ~a: cannot unset~n"
+                                     "jsh: unset: ~a: cannot unset~n"
                                      name)
                                    (set! status 1))
                                   __exn)])
@@ -3205,7 +3205,7 @@
                           (begin
                             (fprintf
                               (current-error-port)
-                              "gsh: unset: `~a': not a valid identifier~n"
+                              "jsh: unset: `~a': not a valid identifier~n"
                               name)
                             (set! status 1))
                           (guard (__exn
@@ -3213,7 +3213,7 @@
                                     ((lambda (e)
                                        (fprintf
                                          (current-error-port)
-                                         "gsh: unset: ~a: cannot unset: readonly variable~n"
+                                         "jsh: unset: ~a: cannot unset: readonly variable~n"
                                          name)
                                        (set! status 1))
                                       __exn)])
@@ -3437,7 +3437,7 @@
         (begin
           (fprintf
             (current-error-port)
-            "gsh: exit: too many arguments~n")
+            "jsh: exit: too many arguments~n")
           (if (*in-subshell*)
               (raise (make-subshell-exit-exception 2))
               (exit 2)))
@@ -3447,13 +3447,13 @@
                             [(not n)
                              (fprintf
                                (current-error-port)
-                               "gsh: exit: ~a: numeric argument required~n"
+                               "jsh: exit: ~a: numeric argument required~n"
                                (car args))
                              2]
                             [(or (> n 2147483647) (< n -2147483648))
                              (fprintf
                                (current-error-port)
-                               "gsh: exit: ~a: expected a small integer~n"
+                               "jsh: exit: ~a: expected a small integer~n"
                                (car args))
                              1]
                             [else (bitwise-and n 255)]))
@@ -3477,13 +3477,13 @@
                         [(not n)
                          (fprintf
                            (current-error-port)
-                           "gsh: return: ~a: numeric argument required~n"
+                           "jsh: return: ~a: numeric argument required~n"
                            (car args))
                          2]
                         [(or (> n 2147483647) (< n -2147483648))
                          (fprintf
                            (current-error-port)
-                           "gsh: return: ~a: expected a small integer~n"
+                           "jsh: return: ~a: expected a small integer~n"
                            (car args))
                          1]
                         [else (bitwise-and n 255)]))
@@ -3495,7 +3495,7 @@
       [(> (length args) 1)
        (fprintf
          (current-error-port)
-         "gsh: break: too many arguments~n")
+         "jsh: break: too many arguments~n")
        (flush-output-port (current-error-port))
        (if (*in-subshell*)
            (raise (make-subshell-exit-exception 1))
@@ -3506,14 +3506,14 @@
            [(not n)
             (fprintf
               (current-error-port)
-              "gsh: break: ~a: numeric argument required~n"
+              "jsh: break: ~a: numeric argument required~n"
               (car args))
             (env-set-last-status! env 1)
             (shell-break! 1)]
            [(<= n 0)
             (fprintf
               (current-error-port)
-              "gsh: break: ~a: loop count out of range~n"
+              "jsh: break: ~a: loop count out of range~n"
               (car args))
             (env-set-last-status! env 1)
             (shell-break! 1)]
@@ -3525,7 +3525,7 @@
       [(> (length args) 1)
        (fprintf
          (current-error-port)
-         "gsh: continue: too many arguments~n")
+         "jsh: continue: too many arguments~n")
        (flush-output-port (current-error-port))
        (if (*in-subshell*)
            (raise (make-subshell-exit-exception 1))
@@ -3536,14 +3536,14 @@
            [(not n)
             (fprintf
               (current-error-port)
-              "gsh: continue: ~a: numeric argument required~n"
+              "jsh: continue: ~a: numeric argument required~n"
               (car args))
             (env-set-last-status! env 1)
             (shell-continue! 1)]
            [(<= n 0)
             (fprintf
               (current-error-port)
-              "gsh: continue: ~a: loop count out of range~n"
+              "jsh: continue: ~a: loop count out of range~n"
               (car args))
             (env-set-last-status! env 1)
             (shell-continue! 1)]
@@ -3633,13 +3633,13 @@
             [(not n)
              (fprintf
                (current-error-port)
-               "gsh: shift: ~a: numeric argument required~n"
+               "jsh: shift: ~a: numeric argument required~n"
                (car args))
              2]
             [(< n 0)
              (fprintf
                (current-error-port)
-               "gsh: shift: ~a: shift count out of range~n"
+               "jsh: shift: ~a: shift count out of range~n"
                (car args))
              1]
             [else
@@ -3666,7 +3666,7 @@
               (not (string=? (car args) "--")))
          (fprintf
            (current-error-port)
-           "gsh: eval: ~a: invalid option~n"
+           "jsh: eval: ~a: invalid option~n"
            (car args))
          2]
         [else
@@ -3677,7 +3677,7 @@
                (begin
                  (fprintf
                    (current-error-port)
-                   "gsh: eval: executor not initialized~n")
+                   "jsh: eval: executor not initialized~n")
                  1)))])))
   (defbuiltin
     "test"
@@ -3771,7 +3771,7 @@
                [else
                 (fprintf
                   (current-error-port)
-                  "gsh: command: ~a: not found~n"
+                  "jsh: command: ~a: not found~n"
                   name)
                 1]))
            1)]
@@ -3796,7 +3796,7 @@
                [else
                 (fprintf
                   (current-error-port)
-                  "gsh: command: ~a: not found~n"
+                  "jsh: command: ~a: not found~n"
                   name)
                 1]))
            1)]
@@ -3816,7 +3816,7 @@
                        (begin
                          (fprintf
                            (current-error-port)
-                           "gsh: ~a: command not found~n"
+                           "jsh: ~a: command not found~n"
                            cmd-name)
                          127)))))))]))
   (defbuiltin
@@ -3829,7 +3829,7 @@
               (begin
                 (fprintf
                   (current-error-port)
-                  "gsh: builtin: ~a: not a shell builtin~n"
+                  "jsh: builtin: ~a: not a shell builtin~n"
                   (car args))
                 1)))))
   (defbuiltin
@@ -4797,20 +4797,20 @@
       [(and (pair? args) (pair? (cdr args)))
        (fprintf
          (current-error-port)
-         "gsh: history: too many arguments~n")
+         "jsh: history: too many arguments~n")
        2]
       [(and (pair? args)
             (> (string-length (car args)) 0)
             (char=? (string-ref (car args) 0) #\-))
        (fprintf
          (current-error-port)
-         "gsh: history: ~a: invalid option~n"
+         "jsh: history: ~a: invalid option~n"
          (car args))
        2]
       [(and (pair? args) (not (string->number (car args))))
        (fprintf
          (current-error-port)
-         "gsh: history: ~a: numeric argument required~n"
+         "jsh: history: ~a: numeric argument required~n"
          (car args))
        2]
       [else
@@ -5161,7 +5161,7 @@
     "help"
     (if (null? args)
         (begin
-          (begin (display "gsh - Gerbil Shell") (newline))
+          (begin (display "jsh - Jerboa Shell") (newline))
           (begin (display "Built-in commands:") (newline))
           (for-each
             (lambda (name)
