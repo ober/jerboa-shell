@@ -29,7 +29,12 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (gsh util) (gsh fuzzy) (gsh lineedit) (gsh ffi))
+    (std sugar)
+    (except (jsh util) string-index string-join file-directory?
+      string-join string-index string-downcase file-regular?
+      string-upcase)
+    (jsh fuzzy) (except (jsh lineedit) ESC-STR user-name)
+    (jsh ffi))
   (begin
     (define fzf-state::t
       (make-class-type 'gerbil\x23;fzf-state::t 'fzf-state (list object::t)

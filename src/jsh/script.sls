@@ -32,9 +32,14 @@
      path-normalize
      path-absolute?)
    (except (std format) format) (std sort) (std pregexp)
-   (std sugar) (gsh util) (gsh ast) (gsh environment)
-   (gsh functions) (gsh lexer) (gsh parser) (gsh executor)
-   (gsh signals) (gsh jobs) (gsh static-compat) (gsh registry))
+   (std sugar)
+   (except (jsh util) string-index string-join file-directory?
+     string-join string-index string-downcase file-regular?
+     string-upcase)
+   (jsh ast) (jsh environment) (jsh functions) (jsh lexer)
+   (jsh parser) (jsh executor) (jsh signals)
+   (except (jsh jobs) any every find) (jsh static-compat)
+   (jsh registry))
   (define *meta-command-handler* (make-parameter #f))
   (define *gerbil-eval-initialized*-cell (vector #f))
   (define-syntax *gerbil-eval-initialized*
@@ -46,7 +51,7 @@
                      v)]))
   (define (ensure-gerbil-eval!)
     "Initialize the Gerbil expander on first use so eval supports full\n   Gerbil syntax (def, defstruct, hash, match, import, etc.).\n   Called lazily to avoid ~100ms startup cost for normal shell operations.\n   Blocked in the 'tiny' tier which has no eval support."
-    (when (string=? (*gsh-tier*) "tiny")
+    (when (string=? (*jsh-tier*) "tiny")
       (error 'gerbil
         "Gerbil eval not available in this build (tier: tiny). Rebuild with GSH_TIER=small or higher"))
     (unless *gerbil-eval-initialized*

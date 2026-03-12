@@ -31,8 +31,11 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (gsh ffi) (gsh util)
-    (only (gsh expander) find-matching-paren))
+    (std sugar) (jsh ffi)
+    (except (jsh util) string-index string-join file-directory?
+      string-join string-index string-downcase file-regular?
+      string-upcase)
+    (only (jsh expander) find-matching-paren))
   (define expand-prompt
     (case-lambda
       [(ps-string env-get)

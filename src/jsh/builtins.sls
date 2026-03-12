@@ -60,9 +60,13 @@
      pregexp-replace pregexp-split pregexp-match
      pregexp-match-positions pregexp)
    (std os signal) (except (std os fdio) write-subu8vector)
-   (gsh ast) (gsh ffi) (gsh environment) (gsh expander)
-   (gsh functions) (gsh jobs) (gsh signals) (gsh history)
-   (gsh util) (gsh registry) (gsh macros) (gsh arithmetic))
+   (jsh ast) (jsh ffi) (jsh environment) (jsh expander)
+   (jsh functions) (except (jsh jobs) any every find)
+   (jsh signals) (except (jsh history) string-trim)
+   (except (jsh util) string-index string-join file-directory?
+     string-join string-index string-downcase file-regular?
+     string-upcase)
+   (jsh registry) (jsh macros) (jsh arithmetic))
   (define *execute-external-fn* (make-parameter #f))
   (define (fd-read-char rfd)
     (let ([bv (ffi-fdread rfd 1)])

@@ -60,7 +60,9 @@
     (except (jsh pregexp-compat) pregexp-quote pregexp-replace*
       pregexp-replace pregexp-split pregexp-match
       pregexp-match-positions pregexp)
-    (gsh util))
+    (except (jsh util) string-index string-join file-directory?
+      string-join string-index string-downcase file-regular?
+      string-upcase))
   (define (make-history-entry timestamp cwd command)
     (vector timestamp cwd command))
   (define (history-entry-timestamp entry)

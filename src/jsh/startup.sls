@@ -27,7 +27,11 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (gsh util) (gsh environment) (gsh script))
+    (std sugar)
+    (except (jsh util) string-index string-join file-directory?
+      string-join string-index string-downcase file-regular?
+      string-upcase)
+    (jsh environment) (jsh script))
   (define (load-startup-files! env login? interactive?)
     (cond
       [(and login? interactive?)

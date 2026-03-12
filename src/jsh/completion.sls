@@ -35,8 +35,13 @@
      path-normalize
      path-absolute?)
    (except (std format) format) (std sort) (std pregexp)
-   (std sugar) (gsh util) (gsh environment) (gsh registry)
-   (gsh builtins) (gsh functions) (gsh glob))
+   (std sugar)
+   (except (jsh util) string-index string-join file-directory?
+     string-join string-index string-downcase file-regular?
+     string-upcase)
+   (jsh environment) (jsh registry)
+   (except (jsh builtins) list-head) (jsh functions)
+   (jsh glob))
   (define *complete-specs* (make-hash-table))
   (define (complete-register! command spec)
     (hash-put! *complete-specs* command spec))

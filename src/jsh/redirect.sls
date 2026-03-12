@@ -34,8 +34,11 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (gsh ast) (gsh ffi) (gsh environment)
-    (gsh expander) (gsh util))
+    (std sugar) (jsh ast) (jsh ffi) (jsh environment)
+    (jsh expander)
+    (except (jsh util) string-index string-join file-directory?
+      string-join string-index string-downcase file-regular?
+      string-upcase))
   (define O_RDONLY 0)
   (define O_WRONLY 1)
   (define O_RDWR 2)

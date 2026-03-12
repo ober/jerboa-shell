@@ -47,10 +47,14 @@
    (except (jsh pregexp-compat) pregexp-quote pregexp-replace*
      pregexp-replace pregexp-split pregexp-match
      pregexp-match-positions pregexp)
-   (gsh ast) (gsh environment) (gsh expander) (gsh registry)
-   (gsh builtins) (gsh functions) (gsh pipeline) (gsh redirect)
-   (gsh control) (gsh jobs) (gsh util) (gsh arithmetic)
-   (gsh ffi) (gsh glob) (gsh signals))
+   (jsh ast) (jsh environment) (jsh expander) (jsh registry)
+   (except (jsh builtins) list-head) (jsh functions)
+   (except (jsh pipeline) void) (jsh redirect) (jsh control)
+   (except (jsh jobs) any every find)
+   (except (jsh util) string-index string-join file-directory?
+     string-join string-index string-downcase file-regular?
+     string-upcase)
+   (jsh arithmetic) (jsh ffi) (jsh glob) (jsh signals))
   (define (execute-command cmd env)
     (cond
       [(not cmd) 0]

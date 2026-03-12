@@ -115,7 +115,7 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (gsh ffi))
+    (std sugar) (jsh ffi))
   (define *execute-input* (make-parameter #f))
   (define *arith-eval-fn* (make-parameter #f))
   (define *interactive-shell* (make-parameter #f))

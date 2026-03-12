@@ -29,8 +29,8 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
-    (std sugar) (gsh ast) (gsh environment) (gsh expander)
-    (gsh glob) (gsh functions))
+    (std sugar) (jsh ast) (jsh environment) (jsh expander)
+    (jsh glob) (jsh functions))
   (define (with-loop-context thunk)
     (parameterize ([*loop-depth* (+ (*loop-depth*) 1)])
       (thunk)))

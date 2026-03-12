@@ -57,6 +57,38 @@
     (:gerbil/compiler   . #f)
     ;; Relative imports
     ("./pregexp-compat" . (jsh pregexp-compat))
+    ;; gsh module mappings → jsh
+    (:gsh/arithmetic   . (jsh arithmetic))
+    (:gsh/ast          . (jsh ast))
+    (:gsh/builtins     . (jsh builtins))
+    (:gsh/completion   . (jsh completion))
+    (:gsh/control      . (jsh control))
+    (:gsh/environment  . (jsh environment))
+    (:gsh/executor     . (jsh executor))
+    (:gsh/expander     . (jsh expander))
+    (:gsh/ffi          . (jsh ffi))
+    (:gsh/functions    . (jsh functions))
+    (:gsh/fuzzy        . (jsh fuzzy))
+    (:gsh/fzf          . (jsh fzf))
+    (:gsh/glob         . (jsh glob))
+    (:gsh/history      . (jsh history))
+    (:gsh/jobs         . (jsh jobs))
+    (:gsh/lexer        . (jsh lexer))
+    (:gsh/lineedit     . (jsh lineedit))
+    (:gsh/macros       . (jsh macros))
+    (:gsh/main         . (jsh main))
+    (:gsh/parser       . (jsh parser))
+    (:gsh/pipeline     . (jsh pipeline))
+    (:gsh/pregexp-compat . (jsh pregexp-compat))
+    (:gsh/prompt       . (jsh prompt))
+    (:gsh/redirect     . (jsh redirect))
+    (:gsh/registry     . (jsh registry))
+    (:gsh/script       . (jsh script))
+    (:gsh/signals      . (jsh signals))
+    (:gsh/stage        . (jsh stage))
+    (:gsh/startup      . (jsh startup))
+    (:gsh/static-compat . (jsh static-compat))
+    (:gsh/util         . (jsh util))
     ))
 
 ;; --- Base imports for all compiled modules ---
@@ -510,5 +542,9 @@
       "             [(not var) (getenv resolved #f)]\n"
       "             [(shell-var-nameref? var) #f]\n"
       "             [else (shell-var-scalar-value var)])))])")))
+  
+  ;; Rename *gsh-tier* to *jsh-tier* throughout all generated files  
+  (system "sed -i 's/\\*gsh-tier\\*/\\*jsh-tier\\*/g' src/jsh/*.sls")
+  (display "  Patched all .sls files (gsh-tier → jsh-tier)\n"))
 
 (display "\n=== Build complete ===\n")

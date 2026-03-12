@@ -30,9 +30,12 @@
      path-normalize
      path-absolute?)
    (except (std format) format) (std sort) (std pregexp)
-   (std sugar) (gsh ast) (gsh ffi) (gsh environment)
-   (gsh expander) (gsh redirect) (gsh registry) (gsh builtins)
-   (gsh functions) (gsh util))
+   (std sugar) (jsh ast) (jsh ffi) (jsh environment)
+   (jsh expander) (jsh redirect) (jsh registry)
+   (except (jsh builtins) list-head) (jsh functions)
+   (except (jsh util) string-index string-join file-directory?
+     string-join string-index string-downcase file-regular?
+     string-upcase))
   (define (pipeline-temp-env assignments env)
     (let ([child (env-push-scope env)])
       (for-each
