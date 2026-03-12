@@ -2,12 +2,20 @@
 ;; Entry point for jerboa-shell
 (import (chezscheme) (jsh main) (except (jsh builtins) list-head)
         (jsh registry) (jsh script) (jsh sandbox)
-        (only (jsh executor) *jsh-profile-mode* profile-reset! profile-get-data
-              ast->command-text)
+        (only (jsh executor) ast->command-text)
         (only (jsh parser) parse-complete-command)
         (only (jsh ast) ast-pipeline? ast-pipeline-commands ast-pipeline-bang?)
         (only (compiler compile) gerbil-compile-top)
         (only (reader reader) gerbil-read))
+
+;; Profile mode tracking (local implementation)
+(define *jsh-profile-mode* (make-parameter #f))
+(define *profile-data* '())
+(define (profile-reset!) (set! *profile-data* '()))
+(define (profile-get-data) (reverse *profile-data*))
+(define (profile-record! elapsed-ms text)
+  (when (*jsh-profile-mode*)
+    (set! *profile-data* (cons (list elapsed-ms text) *profile-data*))))
 
 ;; Set tier and force builtin registration
 (*jsh-tier* "small")
@@ -49,9 +57,7 @@
           (std os path)
           (std format)
           (std sort)
-          (std pregexp)
-          (except (std capability) with-sandbox)
-          (except (std capability sandbox) with-sandbox)))
+          (std pregexp)))
       ;; Shell helpers: place run-cmd / run-script in the interaction env by name
       ;; using define-top-level-value (bypasses WPO and program-namespace isolation).
       ;; Using mangled names avoids Gherkin seeing them as macro candidates.
