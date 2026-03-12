@@ -48,6 +48,8 @@
     (except (std format) format) (std sort) (std pregexp)
     ;; Structured logging (component=jobs)
     (only (std log) make-logger log-info log-debug)
+    ;; STM: race-free job table updates
+    (only (std stm) make-tvar tvar-ref atomically tvar-read tvar-write!)
     (std sugar) (std os signal) (jsh ffi)
     (except (jsh util) string-index string-join file-directory?
       string-join string-index string-downcase file-regular?
@@ -151,26 +153,22 @@
       (unchecked-slot-set! obj 'status val))
     (define (&job-process-port-set! obj val)
       (unchecked-slot-set! obj 'port val)))
-  (define *job-table*-cell (vector (list)))
+  ;; STM-backed job table: transactional variables eliminate TOCTOU races
+  ;; between main thread and signal handlers.
+  ;; Internal TVars (use tvar-ref for reads, tvar-write! within atomically for writes)
+  (define *jt-table-tv*   (make-tvar '()))
+  (define *jt-next-id-tv* (make-tvar 1))
+  (define *jt-current-tv* (make-tvar #f))
+  (define *jt-prev-tv*    (make-tvar #f))
+  ;; Exported read-only identifier-syntax (backward-compatible API)
   (define-syntax *job-table*
-    (identifier-syntax
-      [id (vector-ref *job-table*-cell 0)]
-      [(set! id v) (vector-set! *job-table*-cell 0 v)]))
-  (define *next-job-id*-cell (vector 1))
+    (identifier-syntax (tvar-ref *jt-table-tv*)))
   (define-syntax *next-job-id*
-    (identifier-syntax
-      [id (vector-ref *next-job-id*-cell 0)]
-      [(set! id v) (vector-set! *next-job-id*-cell 0 v)]))
-  (define *current-job*-cell (vector #f))
+    (identifier-syntax (tvar-ref *jt-next-id-tv*)))
   (define-syntax *current-job*
-    (identifier-syntax
-      [id (vector-ref *current-job*-cell 0)]
-      [(set! id v) (vector-set! *current-job*-cell 0 v)]))
-  (define *previous-job*-cell (vector #f))
+    (identifier-syntax (tvar-ref *jt-current-tv*)))
   (define-syntax *previous-job*
-    (identifier-syntax
-      [id (vector-ref *previous-job*-cell 0)]
-      [(set! id v) (vector-set! *previous-job*-cell 0 v)]))
+    (identifier-syntax (tvar-ref *jt-prev-tv*)))
   ;; Debug logger: activated by JSH_DEBUG=1/all or including "jobs"
   (define *jsh-debug-logger*
     (let ((val (getenv "JSH_DEBUG" #f)))
@@ -186,49 +184,35 @@
   (define job-table-add!
     (case-lambda
       [(processes command-text)
-       (let* ([pgid #f])
-         (let* ([id *next-job-id*])
-           (let* ([job-procs (map (lambda (pp)
-                                    (make-job-process
-                                      (car pp)
-                                      'running
-                                      (cdr pp)))
-                                  processes)])
-             (let* ([job (make-job id
-                           (or pgid
-                               (if (pair? processes) (caar processes) 0))
-                           job-procs 'running command-text #t)])
-               (set! *next-job-id* (+ id 1))
-               (set! *previous-job* *current-job*)
-               (set! *current-job* id)
-               (set! *job-table* (append *job-table* (list job)))
-               (jobs-debug-log "job-add: [~a] ~a" id command-text)
-               job))))]
+       (job-table-add! processes command-text #f)]
       [(processes command-text pgid)
-       (let* ([id *next-job-id*])
-         (let* ([job-procs (map (lambda (pp)
-                                  (make-job-process
-                                    (car pp)
-                                    'running
-                                    (cdr pp)))
-                                processes)])
-           (let* ([job (make-job id
-                         (or pgid
-                             (if (pair? processes) (caar processes) 0))
-                         job-procs 'running command-text #t)])
-             (set! *next-job-id* (+ id 1))
-             (set! *previous-job* *current-job*)
-             (set! *current-job* id)
-             (set! *job-table* (append *job-table* (list job)))
-             job)))]))
+       (let ([job-procs (map (lambda (pp)
+                               (make-job-process (car pp) 'running (cdr pp)))
+                             processes)])
+         ;; Atomically allocate job id and update all 4 table variables
+         (let ([job (atomically
+                      (let* ([id      (tvar-read *jt-next-id-tv*)]
+                             [eff-pgid (or pgid
+                                          (if (pair? processes) (caar processes) 0))]
+                             [j       (make-job id eff-pgid job-procs
+                                                'running command-text #t)])
+                        (tvar-write! *jt-next-id-tv* (+ id 1))
+                        (tvar-write! *jt-prev-tv*    (tvar-read *jt-current-tv*))
+                        (tvar-write! *jt-current-tv* id)
+                        (tvar-write! *jt-table-tv*
+                                     (append (tvar-read *jt-table-tv*) (list j)))
+                        j))])
+           (jobs-debug-log "job-add: [~a] ~a" (job-id job) command-text)
+           job))]))
   (define (job-table-remove! job-id)
-    (set! *job-table*
-      (filter
-        (lambda (j) (not (= (job-id j) job-id)))
-        *job-table*))
-    (when (and *current-job* (= *current-job* job-id))
-      (set! *current-job* *previous-job*)
-      (set! *previous-job* #f)))
+    (atomically
+      (tvar-write! *jt-table-tv*
+        (filter (lambda (j) (not (= (job-id j) job-id)))
+                (tvar-read *jt-table-tv*)))
+      (when (let ([cur (tvar-read *jt-current-tv*)])
+              (and cur (= cur job-id)))
+        (tvar-write! *jt-current-tv* (tvar-read *jt-prev-tv*))
+        (tvar-write! *jt-prev-tv* #f))))
   (define (job-table-list) *job-table*)
   (define (job-table-get spec)
     (cond
@@ -340,15 +324,15 @@
             (job-command-text job))
           (job-notify?-set! job #f)))
       *job-table*)
-    (set! *job-table*
-      (filter
-        (lambda (j) (not (memq (job-status j) '(done killed))))
-        *job-table*)))
+    (atomically
+      (tvar-write! *jt-table-tv*
+        (filter (lambda (j) (not (memq (job-status j) '(done killed))))
+                (tvar-read *jt-table-tv*)))))
   (define (job-table-cleanup!)
-    (set! *job-table*
-      (filter
-        (lambda (j) (not (memq (job-status j) '(done killed))))
-        *job-table*)))
+    (atomically
+      (tvar-write! *jt-table-tv*
+        (filter (lambda (j) (not (memq (job-status j) '(done killed))))
+                (tvar-read *jt-table-tv*)))))
   (define (wait-for-foreground-process-raw pid)
     (let loop ([delay 0.001])
       (let ([result (ffi-waitpid-pid
