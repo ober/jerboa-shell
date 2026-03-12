@@ -164,7 +164,7 @@ JSH_DEBUG=all ./jsh                         # everything
 
 ## Phase 2: Moderate Effort (half day each)
 
-### 2.1 STM for Job Table — Eliminate Signal Races
+### 2.1 STM for Job Table — Eliminate Signal Races [DONE]
 
 **Problem:** `jobs.sls:152-171` has `*job-table*`, `*next-job-id*`, `*current-job*`, `*previous-job*` as bare mutable globals accessed by both the main thread and signal handlers. Classic TOCTOU race.
 

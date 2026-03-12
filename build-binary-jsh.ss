@@ -128,6 +128,7 @@
         "std/misc/list"
         "std/misc/alist"
         "std/misc/thread"
+        "std/stm"
         "std/os/path"
         "std/os/signal"
         "std/os/fdio"
