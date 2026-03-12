@@ -132,7 +132,9 @@
         "std/os/signal"
         "std/os/fdio"
         "std/transducer"
-        "std/log"))
+        "std/log"
+        "std/capability"
+        "std/capability/sandbox"))
     ;; Gherkin runtime (MOP chain — needed by compiled Gerbil code)
     (map (lambda (m) (format "~a/~a.so" gherkin-dir m))
       '("compat/types"
@@ -159,7 +161,7 @@
         "parser" "functions" "signals" "expander"
         "redirect" "control" "jobs" "builtins"
         "pipeline" "executor" "completion" "prompt"
-        "lineedit" "fzf" "script" "startup" "main"))))
+        "lineedit" "fzf" "script" "startup" "sandbox" "main"))))
 
 ;; --- Step 4: Generate C headers with embedded data ---
 (printf "[4/7] Embedding boot files + program as C headers...~n")

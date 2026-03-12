@@ -39,7 +39,7 @@
    (except (jsh lineedit) user-name) (jsh fzf) (jsh completion)
    (jsh signals) (except (jsh jobs) any every find)
    (jsh script) (jsh startup) (jsh arithmetic) (jsh ffi)
-   (jsh stage))
+   (jsh stage) (jsh sandbox))
   ;; Force invocation of (jsh builtins) for defbuiltin registration
   (define _force-builtins special-builtin?)
   (define (parse-args args)
@@ -141,7 +141,7 @@
       (env-set!
         env
         "SHELL"
-        (or (getenv "GSH_EXE" #f)
+        (or (getenv "JSH_EXE" #f)
             (gambit-path-normalize (car (command-line)))))
       (env-set! env "GSH_VERSION" "0.1.0")
       (unless (env-get env "PS1")
@@ -392,6 +392,7 @@
         (let* ([script (hash-ref args-hash 'script)])
           (let* ([login? (hash-ref args-hash 'login?)])
             (let* ([env (init-shell-env args-hash)])
+              (*current-jsh-env* env)
               (cond
                 [command
                  (let ([script-args (hash-ref args-hash 'args)])

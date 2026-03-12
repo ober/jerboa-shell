@@ -1,7 +1,7 @@
 #!chezscheme
 ;; Entry point for jerboa-shell
 (import (chezscheme) (jsh main) (except (jsh builtins) list-head)
-        (jsh registry) (jsh script)
+        (jsh registry) (jsh script) (jsh sandbox)
         (only (compiler compile) gerbil-compile-top)
         (only (reader reader) gerbil-read))
 
@@ -45,7 +45,17 @@
           (std os path)
           (std format)
           (std sort)
-          (std pregexp)))
+          (std pregexp)
+          (except (std capability) with-sandbox)
+          (except (std capability sandbox) with-sandbox)))
+      ;; Shell helpers: place run-cmd / run-script in the interaction env by name
+      ;; using define-top-level-value (bypasses WPO and program-namespace isolation).
+      ;; Using mangled names avoids Gherkin seeing them as macro candidates.
+      (define-top-level-value '|jsh:run-cmd|    run-cmd    (interaction-environment))
+      (define-top-level-value '|jsh:run-script| run-script (interaction-environment))
+      ;; Now inject into Gerbil env using a plain-symbol alias (no raw proc values)
+      (eval '(define run-cmd    |jsh:run-cmd|)    env)
+      (eval '(define run-script |jsh:run-script|) env)
       ;; Gambit f64vector shims (Chez uses flvector)
       (eval '(define (make-f64vector n . rest)
                (if (null? rest) (make-flvector n)
@@ -79,7 +89,31 @@
       ;; Gambit I/O shims
       (eval '(define (force-output . args)
                (flush-output-port
-                 (if (null? args) (current-output-port) (car args)))) env))))
+                 (if (null? args) (current-output-port) (car args)))) env)
+      (void))))
+
+;; Handle (with-sandbox kw: val ... body) intercepted before Gerbil compilation.
+;; Parses opts from the Gerbil AST, compiles body as a thunk, calls jsh-sandbox-run.
+(define (handle-with-sandbox-form form)
+  (ensure-gerbil-env!)
+  ;; form is (with-sandbox kw: v1 kw2: v2 ... body)
+  ;; all args except last are keyword/value pairs; last is the body
+  (let* ((args (cdr form))
+         (n    (length args)))
+    (when (< n 1)
+      (error 'with-sandbox "expected at least a body expression"))
+    (let* ((opts-flat (list-head args (- n 1)))
+           (body      (list-ref  args (- n 1)))
+           ;; Build opts as list of (kw val) pairs
+           (opts (let loop ((ls opts-flat))
+                   (if (or (null? ls) (null? (cdr ls)))
+                     '()
+                     (cons (list (car ls) (cadr ls))
+                           (loop (cddr ls))))))
+           ;; Compile body as a Gerbil thunk
+           (thunk (let ((env (interaction-environment)))
+                    (eval (gerbil-compile-top `(lambda () ,body)) env))))
+      (jsh-sandbox-run opts thunk))))
 
 ;; Compile and eval Gerbil forms in the interaction-environment.
 ;; Skips (export ...) and (import ...) forms (Gerbil std imports aren't
@@ -137,6 +171,21 @@
 (define (string-prefix? prefix str)
   (and (>= (string-length str) (string-length prefix))
        (string=? (substring str 0 (string-length prefix)) prefix)))
+
+;; Split a string into whitespace-delimited tokens
+(define (simple-tokenize str)
+  (let lp ((i 0) (start 0) (tokens '()))
+    (cond
+      ((= i (string-length str))
+       (if (> i start)
+         (reverse (cons (substring str start i) tokens))
+         (reverse tokens)))
+      ((char-whitespace? (string-ref str i))
+       (if (> i start)
+         (lp (+ i 1) (+ i 1) (cons (substring str start i) tokens))
+         (lp (+ i 1) (+ i 1) tokens)))
+      (else
+       (lp (+ i 1) start tokens)))))
 
 ;; --- (room) — Common Lisp-style heap/GC introspection ---
 
@@ -281,10 +330,53 @@
         [(string-prefix? "room " expr-str)
          (room #t)
          (cons "" 0)]
-        ;; Normal Gerbil eval
+        ;; ,sb — sandboxed script/command execution
+        ;; Usage: ,sb [options] [-c cmd | script.sh]
+        ;; Options: -r path, -w path, -x cmd, --net, --no-net, -t ms
+        [(or (string=? expr-str "sb")
+             (string-prefix? "sb " expr-str))
+         (let* ((args-str (if (string=? expr-str "sb") ""
+                              (substring expr-str 3 (string-length expr-str))))
+                (args (simple-tokenize args-str)))
+           (if (or (null? args) (member "--help" args))
+             (begin
+               (display "Usage: ,sb [options] [-c cmd | script.sh]\n")
+               (display "Options:\n")
+               (display "  -r path    allow reading path\n")
+               (display "  -w path    allow writing path\n")
+               (display "  -x cmd     allow executing command\n")
+               (display "  --net      allow network access\n")
+               (display "  --no-net   deny network (default)\n")
+               (display "  -t ms      timeout in milliseconds\n")
+               (display "  -c cmd     run inline shell command\n")
+               (cons "" 0))
+             (let* ((parsed  (parse-sb-args args))
+                    (script  (sb-parsed-script parsed))
+                    (cmd-str (sb-parsed-cmd    parsed))
+                    (opts    (sb-parsed-opts   parsed)))
+               (cond
+                 (cmd-str
+                  (let* ((thunk  (lambda () (run-cmd cmd-str)))
+                         (status (jsh-sandbox-run opts thunk)))
+                    (cons "" (if (integer? status) status 1))))
+                 (script
+                  (let* ((thunk  (lambda () (run-script script)))
+                         (status (jsh-sandbox-run opts thunk)))
+                    (cons "" (if (integer? status) status 1))))
+                 (else
+                  (display "jsh: ,sb: no script or command specified\n")
+                  (cons "" 1))))))]
+        ;; Normal Gerbil eval (with special handling for with-sandbox)
         [else
          (let* ((gerbil-forms (gerbil-read-all-from-string expr-str))
-                (result (gerbil-eval-forms gerbil-forms)))
+                (result
+                  ;; Intercept top-level (with-sandbox ...) before Gerbil compilation
+                  ;; so we can call jsh-sandbox-run directly with a compiled thunk.
+                  (if (and (= 1 (length gerbil-forms))
+                           (pair? (car gerbil-forms))
+                           (eq? (caar gerbil-forms) 'with-sandbox))
+                    (handle-with-sandbox-form (car gerbil-forms))
+                    (gerbil-eval-forms gerbil-forms))))
            (cons (format-result result) 0))]))))
 
 ;; Get args from JSH_ARGC/JSH_ARGn env vars (set by gsh-main.c)

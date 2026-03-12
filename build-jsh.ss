@@ -39,6 +39,6 @@
   ;; Tier 6
   (for-each compile-jsh-module '("pipeline" "executor" "completion" "prompt"))
   ;; Tier 7
-  (for-each compile-jsh-module '("lineedit" "fzf" "script" "startup" "main")))
+  (for-each compile-jsh-module '("lineedit" "fzf" "script" "startup" "sandbox" "main")))
 
 (printf "~n=== jsh module compilation complete ===~n")
