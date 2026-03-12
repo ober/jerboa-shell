@@ -16,7 +16,9 @@
    format-time-posix return-status string-join-words
    execute-coproc *next-fake-pid* next-fake-pid!
    launch-background launch-background-simple
-   ast->command-text)
+   ast->command-text
+   ;; Profiling
+   *profile-mode* profile-reset! profile-get-data)
   (import
    (except (chezscheme) box box? unbox set-box! andmap ormap
     iota last-pair find \x31;+ \x31;- fx/ fx1+ fx1- error? raise
@@ -66,8 +68,29 @@
   (define (jsh-debug-log msg . args)
     (when *jsh-debug-logger*
       (apply log-debug *jsh-debug-logger* msg args)))
+  ;; --- Profiling parameters ---
+  ;; Enable with (*profile-mode* #t), read entries with (profile-get-data).
+  ;; profile-reset! clears accumulated data before a profiling run.
+  (define *profile-mode* (make-parameter #f))
+  (define *profile-depth* (make-parameter 0))  ; internal: inhibit nested recording
+  (define *profile-data* '())                   ; module-level accumulator
+  (define (profile-reset!) (set! *profile-data* '()))
+  (define (profile-get-data) (reverse *profile-data*))
+
   (define (execute-command cmd env)
     (cond
+      ;; Profile wrapper: record timing at depth 0 when profiling is active.
+      ;; Recursive calls (depth > 0) fall through to normal execution.
+      [(and (*profile-mode*) (= (*profile-depth*) 0))
+       (let* ((text (if cmd
+                      (guard (e (#t "?")) (ast->command-text cmd))
+                      ""))
+              (start   (real-time))
+              (result  (parameterize ((*profile-depth* 1))
+                         (execute-command cmd env)))
+              (elapsed (- (real-time) start)))
+         (set! *profile-data* (cons (list elapsed text result) *profile-data*))
+         result)]
       [(not cmd) 0]
       [(redirected-command? cmd)
        (let ([s (execute-redirected-command cmd env)])

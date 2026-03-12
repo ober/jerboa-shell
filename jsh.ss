@@ -2,6 +2,7 @@
 ;; Entry point for jerboa-shell
 (import (chezscheme) (jsh main) (except (jsh builtins) list-head)
         (jsh registry) (jsh script) (jsh sandbox)
+        (only (jsh executor) *profile-mode* profile-reset! profile-get-data)
         (only (compiler compile) gerbil-compile-top)
         (only (reader reader) gerbil-read))
 
@@ -187,6 +188,50 @@
       (else
        (lp (+ i 1) start tokens)))))
 
+;; Join a list of strings with separator
+(define (simple-join lst sep)
+  (if (null? lst) ""
+    (let loop ((rest (cdr lst)) (acc (car lst)))
+      (if (null? rest) acc
+        (loop (cdr rest) (string-append acc sep (car rest)))))))
+
+;; --- Profile report printer ---
+(define (print-profile-report data source-name)
+  (let ((port (current-output-port)))
+    (fprintf port "~n=== jsh profile: ~a ===~n" source-name)
+    (if (null? data)
+      (fprintf port "  (no commands recorded)~n")
+      (let* ((total   (apply + (map car data)))
+             (n       (length data))
+             (sorted  (list-sort (lambda (a b) (> (car a) (car b))) data))
+             (slowest (car sorted)))
+        ;; Per-command listing (in execution order)
+        (for-each
+          (lambda (entry)
+            (let* ((elapsed-ms (car entry))
+                   (text       (cadr entry))
+                   (secs       (quotient  elapsed-ms 1000))
+                   (frac       (remainder elapsed-ms 1000))
+                   (display-text (if (> (string-length text) 60)
+                                   (string-append (substring text 0 57) "...")
+                                   text)))
+              (fprintf port "  ~a.~3,'0ds  ~a~n" secs frac display-text)))
+          data)
+        ;; Summary
+        (let* ((total-secs (quotient  total 1000))
+               (total-frac (remainder total 1000))
+               (slow-secs  (quotient  (car slowest) 1000))
+               (slow-frac  (remainder (car slowest) 1000))
+               (slow-pct   (if (> total 0)
+                             (inexact (round (* 100 (/ (car slowest) total))))
+                             0)))
+          (fprintf port "~n--- Summary ---~n")
+          (fprintf port "  Total:    ~a.~3,'0ds~n" total-secs total-frac)
+          (fprintf port "  Commands: ~a~n" n)
+          (fprintf port "  Slowest:  ~a (~a.~3,'0ds, ~a%)~n"
+                   (cadr slowest) slow-secs slow-frac slow-pct))))
+    (fprintf port "~n")))
+
 ;; --- (room) — Common Lisp-style heap/GC introspection ---
 
 (define (format-bytes n)
@@ -330,6 +375,35 @@
         [(string-prefix? "room " expr-str)
          (room #t)
          (cons "" 0)]
+        ;; ,profile — per-command timing for scripts and inline commands
+        ;; Usage: ,profile [-c cmd | script.sh]
+        [(or (string=? expr-str "profile")
+             (string-prefix? "profile " expr-str))
+         (let* ((rest (if (string=? expr-str "profile") ""
+                          (substring expr-str 8 (string-length expr-str))))
+                (args (simple-tokenize rest)))
+           (cond
+             ((or (null? args) (member "--help" args))
+              (display "Usage: ,profile [-c cmd | script.sh]\n")
+              (cons "" 0))
+             ((string=? (car args) "-c")
+              (if (pair? (cdr args))
+                (let* ((cmd-str (simple-join (cdr args) " ")))
+                  (profile-reset!)
+                  (let ((status (parameterize ((*profile-mode* #t))
+                                  (run-cmd cmd-str))))
+                    (print-profile-report (profile-get-data)
+                                          (string-append "-c " cmd-str))
+                    (cons "" (if (integer? status) status 1))))
+                (begin (display "jsh: ,profile -c: missing command\n")
+                       (cons "" 1))))
+             (else
+              (let ((script (car args)))
+                (profile-reset!)
+                (let ((status (parameterize ((*profile-mode* #t))
+                                (run-script script))))
+                  (print-profile-report (profile-get-data) script)
+                  (cons "" (if (integer? status) status 1)))))))]
         ;; ,sb — sandboxed script/command execution
         ;; Usage: ,sb [options] [-c cmd | script.sh]
         ;; Options: -r path, -w path, -x cmd, --net, --no-net, -t ms

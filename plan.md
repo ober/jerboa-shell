@@ -62,7 +62,7 @@ Extend `,sb` to also sandbox inline shell commands:
 
 ---
 
-### 1.3 `,profile` Meta-Command — Script Performance Tracing
+### 1.3 `,profile` Meta-Command — Script Performance Tracing [DONE]
 
 **Problem:** `bash -x` shows what commands run but not how long each takes. No shell has built-in profiling.
 
