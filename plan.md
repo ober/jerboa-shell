@@ -115,7 +115,7 @@ Output:
 
 ---
 
-### 1.4 `,trace` Meta-Command — Pipeline Visualization
+### 1.4 `,trace` Meta-Command — Pipeline Visualization [DONE]
 
 **Problem:** `set -x` output is noisy and doesn't show pipeline structure or fd wiring.
 

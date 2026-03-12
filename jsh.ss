@@ -2,7 +2,10 @@
 ;; Entry point for jerboa-shell
 (import (chezscheme) (jsh main) (except (jsh builtins) list-head)
         (jsh registry) (jsh script) (jsh sandbox)
-        (only (jsh executor) *profile-mode* profile-reset! profile-get-data)
+        (only (jsh executor) *profile-mode* profile-reset! profile-get-data
+              ast->command-text)
+        (only (jsh parser) parse-complete-command)
+        (only (jsh ast) ast-pipeline? ast-pipeline-commands ast-pipeline-bang?)
         (only (compiler compile) gerbil-compile-top)
         (only (reader reader) gerbil-read))
 
@@ -232,6 +235,37 @@
                    (cadr slowest) slow-secs slow-frac slow-pct))))
     (fprintf port "~n")))
 
+;; --- Trace report printer ---
+;; ast: parsed AST or #f; start/end-ms: real-time in ms
+(define (print-trace-report cmd-str ast start-ms end-ms status)
+  (let ((port (current-output-port))
+        (elapsed (- end-ms start-ms)))
+    (fprintf port "~n=== Trace: ~a ===~n" cmd-str)
+    (if (and ast (ast-pipeline? ast))
+      (let* ((commands (ast-pipeline-commands ast))
+             (n        (length commands))
+             (bang?    (ast-pipeline-bang? ast)))
+        (fprintf port "Pipeline: ~a stage~a~a~n"
+                 n (if (= n 1) "" "s") (if bang? " (negated)" ""))
+        (let loop ((cmds commands) (i 1))
+          (unless (null? cmds)
+            (let ((text (guard (e (#t "?")) (ast->command-text (car cmds)))))
+              (cond
+                ((= n 1)
+                 (fprintf port "  [~a] ~a~n" i text))
+                ((= i 1)
+                 (fprintf port "  [~a] ~a  → stdout→pipe~a~n" i text i))
+                ((= i n)
+                 (fprintf port "  [~a] ~a  ← pipe~a → stdout~n" i text (- i 1)))
+                (else
+                 (fprintf port "  [~a] ~a  ← pipe~a → stdout→pipe~a~n"
+                          i text (- i 1) i))))
+            (loop (cdr cmds) (+ i 1)))))
+      (fprintf port "  ~a~n" cmd-str))
+    (fprintf port "~nStatus: ~a~n" status)
+    (fprintf port "Wall time: ~a.~3,'0ds~n~n"
+             (quotient elapsed 1000) (remainder elapsed 1000))))
+
 ;; --- (room) — Common Lisp-style heap/GC introspection ---
 
 (define (format-bytes n)
@@ -375,6 +409,37 @@
         [(string-prefix? "room " expr-str)
          (room #t)
          (cons "" 0)]
+        ;; ,trace — pipeline structure visualization with timing
+        ;; Usage: ,trace [-c cmd | script.sh]
+        [(or (string=? expr-str "trace")
+             (string-prefix? "trace " expr-str))
+         (let* ((rest (if (string=? expr-str "trace") ""
+                          (substring expr-str 6 (string-length expr-str))))
+                (args (simple-tokenize rest)))
+           (cond
+             ((or (null? args) (member "--help" args))
+              (display "Usage: ,trace [-c cmd | script.sh]\n")
+              (cons "" 0))
+             ((string=? (car args) "-c")
+              (if (pair? (cdr args))
+                (let* ((cmd-str (simple-join (cdr args) " "))
+                       (ast     (guard (e (#t #f))
+                                  (parse-complete-command cmd-str #f #f)))
+                       (start   (real-time))
+                       (status  (run-cmd cmd-str))
+                       (end     (real-time)))
+                  (print-trace-report cmd-str ast start end status)
+                  (cons "" (if (integer? status) status 1)))
+                (begin (display "jsh: ,trace -c: missing command\n")
+                       (cons "" 1))))
+             (else
+              (let* ((script  (car args))
+                     (start   (real-time))
+                     (status  (run-script script))
+                     (end     (real-time)))
+                ;; Scripts contain multiple commands; no single-AST analysis
+                (print-trace-report script #f start end status)
+                (cons "" (if (integer? status) status 1))))))]
         ;; ,profile — per-command timing for scripts and inline commands
         ;; Usage: ,profile [-c cmd | script.sh]
         [(or (string=? expr-str "profile")
