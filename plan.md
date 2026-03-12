@@ -147,7 +147,7 @@ Wall time: 0.045s
 
 ---
 
-### 1.5 Structured Logging with `(std log)` — Expand JSH_DEBUG
+### 1.5 Structured Logging with `(std log)` — Expand JSH_DEBUG [DONE]
 
 **Problem:** `JSH_DEBUG=1` exists but only logs in executor. Other modules (pipeline, jobs, redirect, expander) have no tracing.
 

@@ -30,12 +30,26 @@
      path-normalize
      path-absolute?)
    (except (std format) format) (std sort) (std pregexp)
+   ;; Structured logging (component=pipeline)
+   (only (std log) make-logger log-info log-debug)
    (std sugar) (jsh ast) (jsh ffi) (jsh environment)
    (jsh expander) (jsh redirect) (jsh registry)
    (except (jsh builtins) list-head) (jsh functions)
    (except (jsh util) string-index string-join file-directory?
      string-join string-index string-downcase file-regular?
      string-upcase))
+  ;; Debug logger: activated by JSH_DEBUG=1/all or including "pipeline"
+  (define *jsh-debug-logger*
+    (let ((val (getenv "JSH_DEBUG" #f)))
+      (and val
+           (or (string=? val "1")
+               (string=? val "all")
+               (string-contains? val "pipeline"))
+           (make-logger 'debug 'component 'pipeline))))
+  (define (pipeline-debug-log msg . args)
+    (when *jsh-debug-logger*
+      (apply log-debug *jsh-debug-logger* msg args)))
+
   (define (pipeline-temp-env assignments env)
     (let ([child (env-push-scope env)])
       (for-each
@@ -96,6 +110,7 @@
                      (when outer-in (ffi-dup2 outer-in 0))
                      (when outer-out (ffi-dup2 outer-out 1))
                      (let* ([n (length commands)])
+                       (pipeline-debug-log "pipeline: ~a stages" n)
                        (let* ([pipes (make-pipes (- n 1))])
                          (let* ([saved-stdin-fd (ffi-dup 0)])
                            (let* ([saved-stdout-fd (ffi-dup 1)])

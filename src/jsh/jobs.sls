@@ -46,6 +46,8 @@
       path-normalize
       path-absolute?)
     (except (std format) format) (std sort) (std pregexp)
+    ;; Structured logging (component=jobs)
+    (only (std log) make-logger log-info log-debug)
     (std sugar) (std os signal) (jsh ffi)
     (except (jsh util) string-index string-join file-directory?
       string-join string-index string-downcase file-regular?
@@ -169,6 +171,18 @@
     (identifier-syntax
       [id (vector-ref *previous-job*-cell 0)]
       [(set! id v) (vector-set! *previous-job*-cell 0 v)]))
+  ;; Debug logger: activated by JSH_DEBUG=1/all or including "jobs"
+  (define *jsh-debug-logger*
+    (let ((val (getenv "JSH_DEBUG" #f)))
+      (and val
+           (or (string=? val "1")
+               (string=? val "all")
+               (string-contains? val "jobs"))
+           (make-logger 'debug 'component 'jobs))))
+  (define (jobs-debug-log msg . args)
+    (when *jsh-debug-logger*
+      (apply log-debug *jsh-debug-logger* msg args)))
+
   (define job-table-add!
     (case-lambda
       [(processes command-text)
@@ -188,6 +202,7 @@
                (set! *previous-job* *current-job*)
                (set! *current-job* id)
                (set! *job-table* (append *job-table* (list job)))
+               (jobs-debug-log "job-add: [~a] ~a" id command-text)
                job))))]
       [(processes command-text pgid)
        (let* ([id *next-job-id*])

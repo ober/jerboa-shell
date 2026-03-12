@@ -59,12 +59,15 @@
      string-join string-index string-downcase file-regular?
      string-upcase)
    (jsh arithmetic) (jsh ffi) (jsh glob) (jsh signals))
-  ;; Debug logger: activated by JSH_DEBUG=1 environment variable.
-  ;; Uses Jerboa's (std log) structured logging when enabled.
-  ;; Level is 'debug; extra fields tag output with component=executor.
+  ;; Debug logger: activated by JSH_DEBUG=1/all or component name.
+  ;; Examples: JSH_DEBUG=1 (all), JSH_DEBUG=all, JSH_DEBUG=executor,pipeline
   (define *jsh-debug-logger*
-    (and (equal? (getenv "JSH_DEBUG") "1")
-         (make-logger 'debug 'component 'executor)))
+    (let ((val (getenv "JSH_DEBUG" #f)))
+      (and val
+           (or (string=? val "1")
+               (string=? val "all")
+               (string-contains? val "executor"))
+           (make-logger 'debug 'component 'executor))))
   (define (jsh-debug-log msg . args)
     (when *jsh-debug-logger*
       (apply log-debug *jsh-debug-logger* msg args)))
