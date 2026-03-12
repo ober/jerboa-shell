@@ -5,7 +5,7 @@ GHERKIN ?= $(HOME)/mine/gherkin/src
 LIBDIRS = src:$(JERBOA):$(GHERKIN)
 LIBDIRS_JSH = src:$(JERBOA):$(GHERKIN)
 
-.PHONY: ffi jerboa compile run clean test binary all jsh jsh-compile jsh-run jsh-binary compat-test
+.PHONY: ffi jerboa compile run clean test binary all jsh jsh-compile jsh-run jsh-binary compat-test musl musl-jsh
 
 all: ffi jerboa compile
 
@@ -47,6 +47,28 @@ jsh: ffi jsh-binary
 	@echo "=== jsh binary ready ==="
 	@ls -lh jsh
 
+# ─── musl Static Binary ──────────────────────────────────────────────────────
+
+musl-jsh:
+	@echo "=== Building static jsh with musl ==="
+	./build-jsh-musl.sh
+
+musl:
+	@echo "=== Testing musl module ==="
+	@$(SCHEME) --libdirs $(JERBOA) -q << 'EOFTEST' || true; \
+	(import (jerboa build musl)); \
+	(display "musl-gcc: "); \
+	(display (if (musl-available?) "available" "not found")); \
+	(newline); \
+	(when (musl-available?) \
+	  (let ([status (validate-musl-setup)]) \
+	    (display "Status: ") \
+	    (display (car status)) \
+	    (display " - ") \
+	    (display (cdr status)) \
+	    (newline)))
+	EOFTEST
+
 # ─── Testing ─────────────────────────────────────────────────────────────────
 
 test:
@@ -68,7 +90,8 @@ compat-test:
 clean:
 	find src -name "*.so" -delete 2>/dev/null || true
 	find src -name "*.wpo" -delete 2>/dev/null || true
-	rm -f libjsh-ffi.so jsh-all.so jsh.wpo jsh.boot jsh
+	rm -f libjsh-ffi.so libjsh-ffi-musl.so jsh-all.so jsh.wpo jsh.boot jsh jsh-musl build-jsh-musl.ss
+	rm -f jsh_program.h jsh_petite_boot.h jsh_scheme_boot.h jsh_jsh_boot.h
 	# Remove auto-generated jsh .sls files (keep handwritten ones)
 	@for f in ast registry macros util environment lexer arithmetic glob \
 	          fuzzy history parser functions signals expander redirect \

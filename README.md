@@ -34,12 +34,32 @@ A POSIX-compatible shell (`jsh`) built with [Jerboa](https://github.com/ober/jer
 # Build standalone jsh binary (recommended)
 make jsh
 
+# Build static binary with musl (zero dependencies)
+make musl-jsh
+
 # Compile modules only (no binary)
 make jsh-compile
 
 # Run interpreted (no binary needed)
 make jsh-run
 ```
+
+### Static musl Binary
+
+Build a fully static binary that works on any Linux distro:
+
+```bash
+make musl-jsh
+./jsh-musl -c 'echo Works anywhere!'
+```
+
+Benefits:
+- **Zero dependencies** - works on any Linux (kernel 2.6.39+)
+- **20-30% smaller** than glibc static builds
+- **Container-friendly** - runs in `FROM scratch` Docker images
+- **Alpine native** - perfect for Alpine Linux
+
+See [docs/musl-build.md](docs/musl-build.md) for details.
 
 ## Testing
 
