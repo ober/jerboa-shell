@@ -416,64 +416,42 @@
          (room #t)
          (cons "" 0)]
         ;; ,trace — pipeline structure visualization with timing
-        ;; Usage: ,trace [-c cmd | script.sh]
+        ;; Usage: ,trace cmd  (runs cmd as shell command)
         [(or (string=? expr-str "trace")
              (string-prefix? "trace " expr-str))
-         (let* ((rest (if (string=? expr-str "trace") ""
-                          (substring expr-str 6 (string-length expr-str))))
-                (args (simple-tokenize rest)))
+         (let ((rest (if (string=? expr-str "trace") ""
+                         (string-trim-whitespace
+                           (substring expr-str 6 (string-length expr-str))))))
            (cond
-             ((or (null? args) (member "--help" args))
-              (display "Usage: ,trace [-c cmd | script.sh]\n")
+             ((or (string=? rest "") (string-prefix? "--help" rest))
+              (display "Usage: ,trace <command>\n")
               (cons "" 0))
-             ((string=? (car args) "-c")
-              (if (pair? (cdr args))
-                (let* ((cmd-str (simple-join (cdr args) " "))
-                       (ast     (guard (e (#t #f))
-                                  (parse-complete-command cmd-str #f #f)))
-                       (start   (real-time))
-                       (status  (run-cmd cmd-str))
-                       (end     (real-time)))
-                  (print-trace-report cmd-str ast start end status)
-                  (cons "" (if (integer? status) status 1)))
-                (begin (display "jsh: ,trace -c: missing command\n")
-                       (cons "" 1))))
              (else
-              (let* ((script  (car args))
+              (let* ((cmd-str rest)
+                     (ast     (guard (e (#t #f))
+                                (parse-complete-command cmd-str #f #f)))
                      (start   (real-time))
-                     (status  (run-script script))
+                     (status  (run-cmd cmd-str))
                      (end     (real-time)))
-                ;; Scripts contain multiple commands; no single-AST analysis
-                (print-trace-report script #f start end status)
+                (print-trace-report cmd-str ast start end status)
                 (cons "" (if (integer? status) status 1))))))]
-        ;; ,profile — per-command timing for scripts and inline commands
-        ;; Usage: ,profile [-c cmd | script.sh]
+        ;; ,profile — per-command timing
+        ;; Usage: ,profile cmd  (runs cmd as shell command)
         [(or (string=? expr-str "profile")
              (string-prefix? "profile " expr-str))
-         (let* ((rest (if (string=? expr-str "profile") ""
-                          (substring expr-str 8 (string-length expr-str))))
-                (args (simple-tokenize rest)))
+         (let ((rest (if (string=? expr-str "profile") ""
+                         (string-trim-whitespace
+                           (substring expr-str 8 (string-length expr-str))))))
            (cond
-             ((or (null? args) (member "--help" args))
-              (display "Usage: ,profile [-c cmd | script.sh]\n")
+             ((or (string=? rest "") (string-prefix? "--help" rest))
+              (display "Usage: ,profile <command>\n")
               (cons "" 0))
-             ((string=? (car args) "-c")
-              (if (pair? (cdr args))
-                (let* ((cmd-str (simple-join (cdr args) " ")))
-                  (profile-reset!)
-                  (let ((status (parameterize ((*jsh-profile-mode* #t))
-                                  (run-cmd cmd-str))))
-                    (print-profile-report (profile-get-data)
-                                          (string-append "-c " cmd-str))
-                    (cons "" (if (integer? status) status 1))))
-                (begin (display "jsh: ,profile -c: missing command\n")
-                       (cons "" 1))))
              (else
-              (let ((script (car args)))
+              (let* ((cmd-str rest))
                 (profile-reset!)
                 (let ((status (parameterize ((*jsh-profile-mode* #t))
-                                (run-script script))))
-                  (print-profile-report (profile-get-data) script)
+                                (run-cmd cmd-str))))
+                  (print-profile-report (profile-get-data) cmd-str)
                   (cons "" (if (integer? status) status 1)))))))]
         ;; ,sb — sandboxed script/command execution
         ;; Usage: ,sb [options] [-c cmd | script.sh]
