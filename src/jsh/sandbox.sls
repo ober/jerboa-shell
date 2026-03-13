@@ -1,16 +1,15 @@
 #!chezscheme
-;;; (jsh sandbox) — Shell sandbox with Linux Landlock enforcement
+;;; (jsh sandbox) — Shell sandbox integration
 ;;;
-;;; ,sb forks the jsh process, applies Landlock filesystem restrictions
-;;; in the child (before running the command), then runs it. The parent
-;;; jsh process is NEVER affected — Landlock is one-way and permanent.
-;;; Restrictions are real and kernel-enforced.
+;;; Wires the ,sb meta-command to jerboa's (std os sandbox) which provides
+;;; real Landlock enforcement. Forks a child, applies kernel restrictions,
+;;; runs the command, parent is never affected.
 
 (library (jsh sandbox)
   (export *current-jsh-env* run-script run-cmd jsh-sandbox-run
           parse-sb-args sb-parsed-script sb-parsed-cmd sb-parsed-opts)
 
-  (import (chezscheme) (jsh script) (jsh ffi))
+  (import (chezscheme) (jsh script) (std os sandbox))
 
   ;; Current shell environment, set by (jsh main) at startup
   (define *current-jsh-env* (make-parameter #f))
@@ -29,26 +28,6 @@
         (execute-string cmd env)
         (error 'run-cmd "shell not initialized"))))
 
-  ;; --- FFI: Landlock ---
-
-  (define ffi-landlock-sandbox
-    (foreign-procedure "ffi_landlock_sandbox"
-      (string string string) int))
-
-  (define ffi-landlock-abi-version
-    (foreign-procedure "ffi_landlock_abi_version" () int))
-
-  ;; fork(2) — returns pid (>0 parent, 0 child, <0 error)
-  (define c-fork (foreign-procedure "fork" () int))
-
-  ;; Pack a list of strings with SOH (\x01) separator for C FFI
-  (define (pack-paths lst)
-    (if (or (not lst) (null? lst)) ""
-      (let loop ((rest (cdr lst)) (acc (car lst)))
-        (if (null? rest) acc
-          (loop (cdr rest)
-                (string-append acc (string #\x1) (car rest)))))))
-
   ;; Extract a named opt from the parsed opts list
   (define (opt-ref opts name)
     (let loop ((opts opts))
@@ -58,64 +37,13 @@
          (cadr (car opts)))
         (else (loop (cdr opts))))))
 
-  ;; --- Main sandbox entry point ---
-  ;;
-  ;; Fork the jsh process. In the child:
-  ;;   1. Apply Landlock restrictions (permanent, kernel-enforced)
-  ;;   2. Run the thunk (which calls run-cmd or run-script)
-  ;;   3. Exit
-  ;; Parent waits for child and returns exit status.
-  ;;
-  ;; The parent jsh is NEVER sandboxed.
+  ;; Main sandbox entry point.
+  ;; Delegates to (std os sandbox) for real Landlock enforcement.
   (define (jsh-sandbox-run opts thunk)
-    (let* ((read-paths   (or (opt-ref opts "allow-read") '()))
-           (write-paths  (or (opt-ref opts "allow-write") '()))
-           (exec-paths   (or (opt-ref opts "allow-exec") '()))
-           (packed-read  (pack-paths read-paths))
-           (packed-write (pack-paths write-paths))
-           (packed-exec  (pack-paths exec-paths)))
-
-      (let ((pid (c-fork)))
-        (cond
-          ((< pid 0)
-           (error 'jsh-sandbox-run "fork failed"))
-
-          ((= pid 0)
-           ;; === CHILD PROCESS ===
-           ;; Apply Landlock — this is PERMANENT and IRREVERSIBLE
-           (let ((ret (ffi-landlock-sandbox packed-read packed-write packed-exec)))
-             (cond
-               ((< ret 0)
-                (display "sandbox: Landlock enforcement failed\n"
-                         (current-error-port))
-                (exit 126))
-               ((= ret 1)
-                (display "sandbox: Landlock not supported by kernel, "
-                         (current-error-port))
-                (display "running without enforcement\n"
-                         (current-error-port)))))
-           ;; Run the command in the sandboxed child
-           (guard (e [#t
-                     (display "sandbox: " (current-error-port))
-                     (display-condition e (current-error-port))
-                     (newline (current-error-port))
-                     (exit 1)])
-             (thunk))
-           (exit 0))
-
-          (else
-           ;; === PARENT PROCESS ===
-           ;; Wait for sandboxed child
-           (let ((result (ffi-waitpid-pid pid 0)))
-             (if (> result 0)
-               ;; Decode wait status
-               (let ((raw-status (ffi-waitpid-status)))
-                 ;; WIFEXITED: (status & 0x7f) == 0, exit code = (status >> 8) & 0xff
-                 (if (= (bitwise-and raw-status #x7f) 0)
-                   (bitwise-and (bitwise-arithmetic-shift-right raw-status 8) #xff)
-                   ;; Killed by signal
-                   (+ 128 (bitwise-and raw-status #x7f))))
-               1)))))))
+    (let ((read-paths  (or (opt-ref opts "allow-read") '()))
+          (write-paths (or (opt-ref opts "allow-write") '()))
+          (exec-paths  (or (opt-ref opts "allow-exec") '())))
+      (sandbox-run read-paths write-paths exec-paths thunk)))
 
   ;; --- ,sb argument parser ---
 

@@ -40,6 +40,11 @@
   (or (getenv "JERBOA_DIR")
       (format "~a/mine/jerboa/lib" (getenv "HOME"))))
 
+;; Base jerboa directory (parent of lib/) — for support/ files
+(define jerboa-dir-base
+  (or (getenv "JERBOA_BASE_DIR")
+      (format "~a/mine/jerboa" (getenv "HOME"))))
+
 (define gherkin-dir
   (or (getenv "GHERKIN_DIR")
       (format "~a/mine/gherkin/src" (getenv "HOME"))))
@@ -129,7 +134,9 @@
         "std/transducer"
         "std/log"
         "std/capability"
-        "std/capability/sandbox"))
+        "std/capability/sandbox"
+        "std/os/landlock"
+        "std/os/sandbox"))
     ;; Gherkin runtime (MOP chain + compiler)
     (map (lambda (m) (format "~a/~a.so" gherkin-dir m))
       '("compat/types"
@@ -211,6 +218,7 @@
     (display "#include <sys/stat.h>\n" out)
     (display "#include <fcntl.h>\n" out)
     (display "#include <signal.h>\n" out)
+    (display "#include <sys/wait.h>\n" out)
     (display "#include <termios.h>\n" out)
     (display "#include \"scheme.h\"\n\n" out)
     ;; Embed program .so
@@ -240,7 +248,8 @@
         "ffi_file_uid" "ffi_file_gid" "ffi_file_dev" "ffi_file_ino"
         "ffi_getrlimit_soft" "ffi_getrlimit_hard" "ffi_setrlimit"
         "ffi_landlock_abi_version" "ffi_landlock_sandbox"
-        "ffi_sandbox_fork_exec"))
+        "ffi_sandbox_fork_exec"
+        "jerboa_landlock_abi_version" "jerboa_landlock_sandbox"))
     (newline out)
     ;; Wrapper functions for variadic/macro POSIX functions
     ;; (must appear before register_ffi_symbols which takes their address)
@@ -273,13 +282,14 @@
         "ffi_file_uid" "ffi_file_gid" "ffi_file_dev" "ffi_file_ino"
         "ffi_getrlimit_soft" "ffi_getrlimit_hard" "ffi_setrlimit"
         "ffi_landlock_abi_version" "ffi_landlock_sandbox"
-        "ffi_sandbox_fork_exec"))
+        "ffi_sandbox_fork_exec"
+        "jerboa_landlock_abi_version" "jerboa_landlock_sandbox"))
     ;; POSIX functions used via foreign-procedure in ffi.sls
     ;; These are real C functions (not macros) from musl libc
     (for-each
       (lambda (name) (fprintf out "    Sforeign_symbol(\"~a\", (void*)~a);\n" name name))
       '("fork" "_exit" "close" "dup" "dup2" "read" "write" "lseek" "access"
-        "unlink" "getpid" "getppid" "kill" "sysconf"
+        "unlink" "getpid" "getppid" "kill" "sysconf" "waitpid"
         "setpgid" "getpgid" "tcsetpgrp" "tcgetpgrp" "setsid"
         "getuid" "geteuid" "getegid" "isatty" "unsetenv"))
     ;; Variadic/macro POSIX functions need wrappers (defined above)
@@ -348,6 +358,10 @@
 (run-cmd (format "~a -c -O2 -o '~a/ffi-shim.o' ffi-shim.c -Wall"
                  gcc build-dir))
 
+;; Compile landlock-shim.c from jerboa
+(run-cmd (format "~a -c -O2 -o '~a/landlock-shim.o' '~a/support/landlock-shim.c' -Wall"
+                 gcc build-dir jerboa-dir-base))
+
 ;; ========== Step 7: Link static binary ==========
 
 (printf "[7/7] Linking static jsh-musl binary...~n")
@@ -356,7 +370,8 @@
                   "jsh-musl"
                   (list (format "~a/jsh_main_musl.o" build-dir)
                         (format "~a/static_boot.o" build-dir)
-                        (format "~a/ffi-shim.o" build-dir))
+                        (format "~a/ffi-shim.o" build-dir)
+                        (format "~a/landlock-shim.o" build-dir))
                   '())])  ;; no extra static libs beyond Chez's
   (run-cmd link-cmd))
 
