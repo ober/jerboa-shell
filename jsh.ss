@@ -184,18 +184,39 @@
 
 ;; Split a string into whitespace-delimited tokens
 (define (simple-tokenize str)
-  (let lp ((i 0) (start 0) (tokens '()))
-    (cond
-      ((= i (string-length str))
-       (if (> i start)
-         (reverse (cons (substring str start i) tokens))
-         (reverse tokens)))
-      ((char-whitespace? (string-ref str i))
-       (if (> i start)
-         (lp (+ i 1) (+ i 1) (cons (substring str start i) tokens))
-         (lp (+ i 1) (+ i 1) tokens)))
-      (else
-       (lp (+ i 1) start tokens)))))
+  (let ((n (string-length str)))
+    (let lp ((i 0) (tokens '()))
+      (cond
+        ((>= i n) (reverse tokens))
+        ((char-whitespace? (string-ref str i))
+         (lp (+ i 1) tokens))
+        ;; Double-quoted string: collect until closing quote
+        ((char=? (string-ref str i) #\")
+         (let qloop ((j (+ i 1)) (chars '()))
+           (cond
+             ((>= j n)
+              (reverse (cons (list->string (reverse chars)) tokens)))
+             ((char=? (string-ref str j) #\")
+              (lp (+ j 1) (cons (list->string (reverse chars)) tokens)))
+             (else
+              (qloop (+ j 1) (cons (string-ref str j) chars))))))
+        ;; Single-quoted string: collect until closing quote
+        ((char=? (string-ref str i) #\')
+         (let qloop ((j (+ i 1)) (chars '()))
+           (cond
+             ((>= j n)
+              (reverse (cons (list->string (reverse chars)) tokens)))
+             ((char=? (string-ref str j) #\')
+              (lp (+ j 1) (cons (list->string (reverse chars)) tokens)))
+             (else
+              (qloop (+ j 1) (cons (string-ref str j) chars))))))
+        ;; Unquoted word
+        (else
+         (let wloop ((j i))
+           (if (or (>= j n) (char-whitespace? (string-ref str j))
+                   (char=? (string-ref str j) #\") (char=? (string-ref str j) #\'))
+             (lp j (cons (substring str i j) tokens))
+             (wloop (+ j 1)))))))))
 
 ;; Join a list of strings with separator
 (define (simple-join lst sep)

@@ -238,7 +238,9 @@
         "ffi_do_strftime"
         "ffi_file_type" "ffi_file_mode" "ffi_file_size" "ffi_file_mtime"
         "ffi_file_uid" "ffi_file_gid" "ffi_file_dev" "ffi_file_ino"
-        "ffi_getrlimit_soft" "ffi_getrlimit_hard" "ffi_setrlimit"))
+        "ffi_getrlimit_soft" "ffi_getrlimit_hard" "ffi_setrlimit"
+        "ffi_landlock_abi_version" "ffi_landlock_sandbox"
+        "ffi_sandbox_fork_exec"))
     (newline out)
     ;; Wrapper functions for variadic/macro POSIX functions
     ;; (must appear before register_ffi_symbols which takes their address)
@@ -269,7 +271,9 @@
         "ffi_do_strftime"
         "ffi_file_type" "ffi_file_mode" "ffi_file_size" "ffi_file_mtime"
         "ffi_file_uid" "ffi_file_gid" "ffi_file_dev" "ffi_file_ino"
-        "ffi_getrlimit_soft" "ffi_getrlimit_hard" "ffi_setrlimit"))
+        "ffi_getrlimit_soft" "ffi_getrlimit_hard" "ffi_setrlimit"
+        "ffi_landlock_abi_version" "ffi_landlock_sandbox"
+        "ffi_sandbox_fork_exec"))
     ;; POSIX functions used via foreign-procedure in ffi.sls
     ;; These are real C functions (not macros) from musl libc
     (for-each
