@@ -542,8 +542,47 @@
       "             [(not var) (getenv resolved #f)]\n"
       "             [(shell-var-nameref? var) #f]\n"
       "             [else (shell-var-scalar-value var)])))])")))
-  
-  ;; Rename all *gsh-* parameters to *jsh-* throughout all generated files  
+
+;; --- main.sls patches: wire *current-jsh-env* for meta-commands ---
+(let ()
+  (define (string-find haystack needle)
+    (let ((hlen (string-length haystack))
+          (nlen (string-length needle)))
+      (let loop ((i 0))
+        (cond
+          ((> (+ i nlen) hlen) #f)
+          ((string=? (substring haystack i (+ i nlen)) needle) i)
+          (else (loop (+ i 1)))))))
+  (define (patch-file! path old new)
+    (let* ((content (call-with-input-file path
+                      (lambda (p) (get-string-all p))))
+           (idx (string-find content old)))
+      (if idx
+        (begin
+          (call-with-output-file path
+            (lambda (p)
+              (display (substring content 0 idx) p)
+              (display new p)
+              (display (substring content (+ idx (string-length old))
+                                 (string-length content)) p))
+            'replace)
+          (printf "  Patched ~a~n" path)
+          #t)
+        (begin
+          (printf "  (skip) ~a~n" path)
+          #f))))
+
+  ;; Add (jsh sandbox) import to main.sls
+  (patch-file! "src/jsh/main.sls"
+    "(jsh stage))"
+    "(jsh stage)\n   (only (jsh sandbox) *current-jsh-env*))")
+
+  ;; Set *current-jsh-env* after env is created in main
+  (patch-file! "src/jsh/main.sls"
+    "(let* ([env (init-shell-env args-hash)])\n              (cond"
+    "(let* ([env (init-shell-env args-hash)])\n              (*current-jsh-env* env)\n              (cond")
+
+  ;; Rename all *gsh-* parameters to *jsh-* throughout all generated files
   (system "sed -i 's/\\*gsh-/\\*jsh-/g' src/jsh/*.sls")
   (display "  Patched all .sls files (gsh-* → jsh-*)\n"))
 

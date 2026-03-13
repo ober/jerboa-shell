@@ -47,13 +47,19 @@
           (only (std foreign) define-foreign ->))
 
   ;; Load FFI symbols.
+  ;; In static builds (musl), FFI symbols are registered via Sforeign_symbol()
+  ;; before Scheme boots, so load-shared-object is not needed (and dlopen is
+  ;; disabled). In dynamic builds, we use:
   ;; 1. dlopen(NULL) — resolves symbols linked into the binary (-rdynamic)
-  ;; 2. If ./libjsh-ffi.so exists, load it (interpreted mode via LD_LIBRARY_PATH or cwd)
-  (define _ffi-lib (load-shared-object ""))
+  ;; 2. If ./libjsh-ffi.so exists, load it (interpreted mode)
+  (define _ffi-lib
+    (guard (e [#t (void)])  ;; silently skip if dlopen unavailable (static build)
+      (load-shared-object "")))
   (define _ffi-lib-so
-    (if (file-exists? "./libjsh-ffi.so")
-      (load-shared-object "./libjsh-ffi.so")
-      (void)))
+    (guard (e [#t (void)])
+      (if (file-exists? "./libjsh-ffi.so")
+        (load-shared-object "./libjsh-ffi.so")
+        (void))))
 
   ;; --- Wait flags ---
   (define WNOHANG 1)

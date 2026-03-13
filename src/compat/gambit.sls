@@ -102,10 +102,12 @@
 
   ;; Load the FFI shim .so and make all symbols visible.
   ;; Must run before any foreign-procedure call in this or later libraries.
+  ;; In static builds (musl), dlopen is unavailable and all symbols are
+  ;; registered via Sforeign_symbol(), so load-shared-object is not needed.
   (define _ffi-preload
     (begin
-      (guard (e (#t #f)) (load-shared-object "./libjsh-ffi.so"))
-      (load-shared-object "")))
+      (guard (e [#t #f]) (load-shared-object "./libjsh-ffi.so"))
+      (guard (e [#t #f]) (load-shared-object ""))))
 
   ;; --- Variadic void ---
   ;; Gerbil's void accepts any number of arguments; Chez's takes 0
